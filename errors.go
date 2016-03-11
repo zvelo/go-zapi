@@ -6,33 +6,30 @@ import (
 )
 
 var (
-	ErrMissingEndpoint    = fmt.Errorf("endpoint is required")
-	ErrInvalidEndpoint    = fmt.Errorf("invalid endpoint")
-	ErrMissingAccessToken = fmt.Errorf("response did not contain an access token")
-	ErrInvalidAccessToken = fmt.Errorf("access token was not a string")
-	ErrMissingUsername    = fmt.Errorf("username is required")
-	ErrMissingPassword    = fmt.Errorf("password is required")
-	ErrMissingRequestID   = fmt.Errorf("response did not contain a request id")
-	ErrMissingURL         = fmt.Errorf("at least one url is required")
-	ErrMissingDataSet     = fmt.Errorf("at least one dataset is required")
-	ErrNilRequest         = fmt.Errorf("request was nil")
+	errMissingAccessToken = fmt.Errorf("response did not contain an access token")
+	errMissingUsername    = fmt.Errorf("username is required")
+	errMissingPassword    = fmt.Errorf("password is required")
+	errMissingRequestID   = fmt.Errorf("response did not contain a request id")
+	errMissingURL         = fmt.Errorf("at least one url is required")
+	errMissingDataSet     = fmt.Errorf("at least one dataset is required")
+	errNilRequest         = fmt.Errorf("request was nil")
 )
 
-type ErrStatusCode int
+type errStatusCode int
 
-func (e ErrStatusCode) Error() string {
+func (e errStatusCode) Error() string {
 	return fmt.Sprintf("unexpected status code: %d (%s)", int(e), http.StatusText(int(e)))
 }
 
-type ErrDecodeJSON string
+type errDecodeJSON string
 
-func (e ErrDecodeJSON) Error() string {
+func (e errDecodeJSON) Error() string {
 	return fmt.Sprintf("could not decode json response: %s", string(e))
 }
 
-type ErrContentType string
+type errContentType string
 
-func (e ErrContentType) Error() string {
+func (e errContentType) Error() string {
 	return fmt.Sprintf("unexpected content type: %s", string(e))
 }
 

@@ -9,11 +9,11 @@ import (
 
 func (c *Client) GetToken() error {
 	if len(c.Username) == 0 {
-		return ErrMissingUsername
+		return errMissingUsername
 	}
 
 	if len(c.Password) == 0 {
-		return ErrMissingPassword
+		return errMissingPassword
 	}
 
 	c.Token = ""
@@ -42,17 +42,17 @@ func (c *Client) GetToken() error {
 	c.debugResponse(resp)
 
 	if resp.StatusCode != 200 {
-		return ErrStatusCode(resp.StatusCode)
+		return errStatusCode(resp.StatusCode)
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 	t := &token{}
 	if err = decoder.Decode(t); err != nil {
-		return ErrDecodeJSON(err.Error())
+		return errDecodeJSON(err.Error())
 	}
 
 	if len(t.AccessToken) == 0 {
-		return ErrMissingAccessToken
+		return errMissingAccessToken
 	}
 
 	c.Token = t.AccessToken

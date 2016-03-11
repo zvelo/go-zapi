@@ -35,13 +35,13 @@ func (c Client) PollOnce(reqID []byte) (*QueryResult, error) {
 	c.debugResponse(resp)
 
 	if resp.StatusCode != 200 {
-		return nil, ErrStatusCode(resp.StatusCode)
+		return nil, errStatusCode(resp.StatusCode)
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 	result := &QueryResult{}
 	if err = decoder.Decode(result); err != nil {
-		return nil, ErrDecodeJSON(err.Error())
+		return nil, errDecodeJSON(err.Error())
 	}
 
 	// TODO(jrubin) is this the right way to test for poll completion?

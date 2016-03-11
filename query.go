@@ -38,7 +38,7 @@ func massageURLs(urls []string) ([]string, error) {
 
 func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
 	if query == nil {
-		return nil, ErrNilRequest
+		return nil, errNilRequest
 	}
 
 	var err error
@@ -48,11 +48,11 @@ func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
 	}
 
 	if len(query.URLs) == 0 {
-		return nil, ErrMissingURL
+		return nil, errMissingURL
 	}
 
 	if len(query.DataSets) == 0 {
-		return nil, ErrMissingDataSet
+		return nil, errMissingDataSet
 	}
 
 	if len(c.Token) == 0 {
@@ -91,21 +91,21 @@ func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
 	c.debugResponse(resp)
 
 	if resp.StatusCode != 201 {
-		return nil, ErrStatusCode(resp.StatusCode)
+		return nil, errStatusCode(resp.StatusCode)
 	}
 
 	if ct := resp.Header.Get("Content-Type"); ct != contentTypeQueryResp {
-		return nil, ErrContentType(ct)
+		return nil, errContentType(ct)
 	}
 
 	decoder := json.NewDecoder(resp.Body)
 	reply := &QueryReply{}
 	if err = decoder.Decode(reply); err != nil {
-		return nil, ErrDecodeJSON(err.Error())
+		return nil, errDecodeJSON(err.Error())
 	}
 
 	if len(reply.RequestIDs) == 0 {
-		return nil, ErrMissingRequestID
+		return nil, errMissingRequestID
 	}
 
 	return reply, nil
