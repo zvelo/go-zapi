@@ -48,7 +48,7 @@ func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
 
 	// TODO(jrubin) is this the right way to test for poll completion?
 	if result.Status == nil {
-		return nil, ErrIncompleteResult(*result)
+		return nil, zapitype.ErrIncompleteResult(*result)
 	}
 
 	return result, nil
