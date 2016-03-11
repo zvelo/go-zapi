@@ -66,7 +66,10 @@ func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
 		return nil, err
 	}
 
-	queryEndpoint := c.endpointURL(urlPath)
+	queryEndpoint, err := c.endpointURL(urlPath)
+	if err != nil {
+		return nil, err
+	}
 
 	req, err := http.NewRequest("POST", queryEndpoint.String(), bytes.NewBuffer(data))
 	if err != nil {

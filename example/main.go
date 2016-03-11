@@ -24,12 +24,7 @@ const (
 )
 
 var (
-	cmd = map[string]subcommand{}
-
-	globalConfig = struct {
-		Endpoint string
-	}{}
-
+	cmd     = map[string]subcommand{}
 	zClient = zapi.New()
 )
 
@@ -38,8 +33,8 @@ func init() {
 
 	// global flags
 	flag.StringVar(&zClient.UserAgent, "user-agent", getDefaultString("ZVELO_USER_AGENT", name+" "+version), "user-agent to use when making requests to zvelo-api [$ZVELO_USER_AGENT]")
-	flag.StringVar(&globalConfig.Endpoint, "endpoint", getDefaultString("ZVELO_ENDPOINT", ""), "URL of the API endpoint [$ZVELO_ENDPOINT]")
-	flag.BoolVar(&zClient.Debug, "debug", getDefaultBool("ZVELO_DEBUG", false), "enable debug logging [$ZVELO_DEBUG]")
+	flag.StringVar(&zClient.Endpoint, "endpoint", getDefaultString("ZVELO_ENDPOINT", zapi.DefaultEndpoint), "URL of the API endpoint [$ZVELO_ENDPOINT]")
+	flag.BoolVar(&zClient.Debug, "debug", getDefaultBool("ZVELO_DEBUG"), "enable debug logging [$ZVELO_DEBUG]")
 }
 
 func main() {
@@ -71,16 +66,16 @@ func getDefaultString(envVar, fallback string) string {
 	return ret
 }
 
-func getDefaultBool(envVar string, fallback bool) bool {
+func getDefaultBool(envVar string) bool {
 	val := os.Getenv(envVar)
 	if len(val) == 0 {
-		return fallback
+		return false
 	}
 
 	ret, err := strconv.ParseBool(val)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing bool: %s\n", err)
-		return fallback
+		return false
 	}
 
 	return ret
@@ -89,10 +84,6 @@ func getDefaultBool(envVar string, fallback bool) bool {
 func parseFlags() (func() error, error) {
 	// parse global flags
 	flag.Parse()
-	if err := setupGlobal(); err != nil {
-		flag.PrintDefaults()
-		return nil, err
-	}
 
 	// parse command
 	if len(flag.Args()) == 0 {
@@ -113,14 +104,4 @@ func parseFlags() (func() error, error) {
 	}
 
 	return sc.Action, nil
-}
-
-func setupGlobal() error {
-	if len(globalConfig.Endpoint) > 0 {
-		if err := zClient.SetEndpoint(globalConfig.Endpoint); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

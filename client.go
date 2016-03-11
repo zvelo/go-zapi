@@ -24,7 +24,7 @@ type Doer interface {
 }
 
 type Client struct {
-	endpoint           *url.URL
+	Endpoint           string
 	Username, Password string
 	Token              string
 	HTTPClient         Doer
@@ -34,45 +34,31 @@ type Client struct {
 
 func New() *Client {
 	ret := &Client{
-		HTTPClient: &http.Client{},
 		UserAgent:  DefaultUserAgent,
+		Endpoint:   DefaultEndpoint,
+		HTTPClient: &http.Client{},
 	}
-
-	_ = ret.SetEndpoint(DefaultEndpoint)
 
 	return ret
 }
 
-func (c *Client) SetEndpoint(endpointURL string) error {
-	if len(endpointURL) == 0 {
-		return ErrMissingEndpoint
+func (c Client) endpointURL(p string) (*url.URL, error) {
+	if strings.Index(c.Endpoint, "://") == -1 {
+		c.Endpoint = "https://" + c.Endpoint
 	}
 
-	if strings.Index(endpointURL, "://") == -1 {
-		endpointURL = "http://" + endpointURL
-	}
-
-	endpoint, err := url.Parse(endpointURL)
+	ret, err := url.Parse(c.Endpoint)
 	if err != nil {
-		return ErrInvalidEndpoint
+		return nil, err
 	}
 
-	endpoint.Path = "/" + APIVersion
-
-	c.endpoint = endpoint
-
-	return nil
-}
-
-func (c Client) endpointURL(p string) *url.URL {
-	ret := *c.endpoint
-	ret.Path = path.Join(ret.Path, p)
+	ret.Path = path.Join(ret.Path, APIVersion, p)
 
 	if len(c.Token) > 0 {
 		ret.RawQuery = url.Values{"access_token": {c.Token}}.Encode()
 	}
 
-	return &ret
+	return ret, nil
 }
 
 func printDump(w io.Writer, dump []byte, prefix string) {

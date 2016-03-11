@@ -17,7 +17,10 @@ func (c *Client) GetToken() error {
 	}
 
 	c.Token = ""
-	tokenEndpoint := c.endpointURL(tokenPath)
+	tokenEndpoint, err := c.endpointURL(tokenPath)
+	if err != nil {
+		return err
+	}
 
 	req, err := http.NewRequest("POST", tokenEndpoint.String(), strings.NewReader(url.Values{
 		"username":   {c.Username},

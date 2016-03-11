@@ -11,7 +11,11 @@ import (
 func (c Client) PollOnce(reqID []byte) (*QueryResult, error) {
 	b64ReqID := base64.RawURLEncoding.EncodeToString(reqID[:])
 
-	queryEndpoint := c.endpointURL(path.Join(urlPath, b64ReqID))
+	queryEndpoint, err := c.endpointURL(path.Join(urlPath, b64ReqID))
+	if err != nil {
+		return nil, err
+	}
+
 	req, err := http.NewRequest("GET", queryEndpoint.String(), nil)
 	if err != nil {
 		return nil, err
