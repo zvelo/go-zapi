@@ -12,6 +12,7 @@ var pollURLs []string
 
 func init() {
 	fs := flag.NewFlagSet("poll", flag.ExitOnError)
+	fs.Usage = cmdUsage(fs, "url [url...]")
 
 	cmd["poll"] = subcommand{
 		FlagSet: fs,
@@ -43,9 +44,11 @@ func pollURL() error {
 		return err
 	}
 
-	// TODO(jrubin) assert(len(reply.RequestIDs) == 1)
+	// TODO(jrubin) assert(len(reply.RequestIDs) > 0)
 
 	errCh := make(chan error)
+
+	// TODO(jrubin) only poll for the first reqid?
 	resultCh := zClient.Poll(reply.RequestIDs[0], errCh)
 
 	for {

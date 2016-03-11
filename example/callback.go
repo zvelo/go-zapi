@@ -24,11 +24,35 @@ var callbackConfig = struct {
 
 func init() {
 	fs := flag.NewFlagSet("callback", flag.ExitOnError)
+	fs.Usage = cmdUsage(fs, "url [url...]")
 
-	fs.StringVar(&callbackConfig.ListenAddress, "listen-address", getDefaultString("ZVELO_LISTEN_ADDRESS", callbackDefaultListenAddress), "address and port to listen for callbacks on [$ZVELO_LISTEN_ADDRESS]")
-	fs.StringVar(&callbackConfig.CallbackURL, "callback-url", getDefaultString("ZVELO_CALLBACK_URL", ""), "publicly accessible base URL that routes to the address used by the address flag [$ZVELO_CALLBACK_URL]")
-	fs.DurationVar(&callbackConfig.Timeout, "timeout", callbackDefaultTimeout, "maximum amount of time to wait for the callback to be called")
-	fs.BoolVar(&callbackConfig.PartialResults, "partial-results", false, "request that datasets be delivered as soon as they become available instead of waiting for all datasets to become available before responding")
+	fs.StringVar(
+		&callbackConfig.ListenAddress,
+		"listen-address",
+		getDefaultString("ZVELO_LISTEN_ADDRESS", callbackDefaultListenAddress),
+		"address and port to listen for callbacks on [$ZVELO_LISTEN_ADDRESS]",
+	)
+
+	fs.StringVar(
+		&callbackConfig.CallbackURL,
+		"callback-url",
+		getDefaultString("ZVELO_CALLBACK_URL", ""),
+		"publicly accessible base URL that routes to the address used by the address flag [$ZVELO_CALLBACK_URL]",
+	)
+
+	fs.DurationVar(
+		&callbackConfig.Timeout,
+		"timeout",
+		callbackDefaultTimeout,
+		"maximum amount of time to wait for the callback to be called",
+	)
+
+	fs.BoolVar(
+		&callbackConfig.PartialResults,
+		"partial-results",
+		false,
+		"request that datasets be delivered as soon as they become available instead of waiting for all datasets to become available before responding",
+	)
 
 	cmd["callback"] = subcommand{
 		FlagSet: fs,
@@ -39,11 +63,11 @@ func init() {
 }
 
 func setupCallback() error {
-	callbackConfig.URLs = cmd["callback"].FlagSet.Args()
-
 	if len(callbackConfig.CallbackURL) == 0 {
 		return fmt.Errorf("-callback-url is required")
 	}
+
+	callbackConfig.URLs = cmd["callback"].FlagSet.Args()
 
 	if len(callbackConfig.URLs) == 0 {
 		return fmt.Errorf("at least one url is required")
@@ -59,11 +83,13 @@ func callbackURL() error {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		// TODO(jrubin)
 		fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
+		// TODO(jrubin) when are we really done?
 		doneCh <- struct{}{}
 	})
 
 	go http.ListenAndServe(callbackConfig.ListenAddress, nil)
 
+	// TODO(jrubin) how to ensure callback comes from zvelo and isn't forged?
 	reply, err := zClient.Query(&zapitype.QueryURLRequests{
 		URLs: callbackConfig.URLs,
 		DataSets: []zapitype.DataSetType{

@@ -11,6 +11,12 @@ import (
 )
 
 func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
+	if len(c.Token) == 0 {
+		if err := c.GetToken(); err != nil {
+			return nil, err
+		}
+	}
+
 	b64ReqID := base64.RawURLEncoding.EncodeToString(reqID[:])
 
 	queryEndpoint, err := c.endpointURL(path.Join(urlPath, b64ReqID))
