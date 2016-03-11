@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/zvelo/go-zapi"
 	"github.com/zvelo/go-zapi/zapitype"
 )
 
@@ -13,12 +12,6 @@ var pollURLs []string
 
 func init() {
 	fs := flag.NewFlagSet("poll", flag.ExitOnError)
-
-	fs.StringVar(&zClient.Username, "username", getDefaultString("ZVELO_USERNAME", ""), "Username to obtain a token as [$ZVELO_USERNAME]")
-	fs.StringVar(&zClient.Password, "password", getDefaultString("ZVELO_PASSWORD", ""), "Password to obtain a token with [$ZVELO_PASSWORD]")
-	fs.StringVar(&zClient.Token, "token", getDefaultString("ZVELO_TOKEN", ""), "Token for making the query [$ZVELO_TOKEN]")
-	fs.DurationVar(&zClient.PollTimeout, "timeout", zapi.DefaultPollTimeout, "timeout after this much time has elapsed")
-	fs.DurationVar(&zClient.PollInterval, "interval", zapi.DefaultPollInterval, "amount of time between polling requests")
 
 	cmd["poll"] = subcommand{
 		FlagSet: fs,
@@ -29,11 +22,6 @@ func init() {
 }
 
 func setupPoll() error {
-	if len(zClient.Token) == 0 &&
-		(len(zClient.Username) == 0 || len(zClient.Password) == 0) {
-		return fmt.Errorf("-token or -username and -password are required")
-	}
-
 	pollURLs = cmd["poll"].FlagSet.Args()
 
 	if len(pollURLs) == 0 {

@@ -3,10 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net/http"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/zvelo/go-zapi"
 )
@@ -29,12 +27,15 @@ var (
 )
 
 func init() {
-	zClient.HTTPClient = &http.Client{}
-
 	// global flags
 	flag.StringVar(&zClient.UserAgent, "user-agent", getDefaultString("ZVELO_USER_AGENT", name+" "+version), "user-agent to use when making requests to zvelo-api [$ZVELO_USER_AGENT]")
 	flag.StringVar(&zClient.Endpoint, "endpoint", getDefaultString("ZVELO_ENDPOINT", zapi.DefaultEndpoint), "URL of the API endpoint [$ZVELO_ENDPOINT]")
 	flag.BoolVar(&zClient.Debug, "debug", getDefaultBool("ZVELO_DEBUG"), "enable debug logging [$ZVELO_DEBUG]")
+	flag.StringVar(&zClient.Token, "token", getDefaultString("ZVELO_TOKEN", ""), "Token for making the query [$ZVELO_TOKEN]")
+	flag.StringVar(&zClient.Username, "username", getDefaultString("ZVELO_USERNAME", ""), "Username to obtain a token as [$ZVELO_USERNAME]")
+	flag.StringVar(&zClient.Password, "password", getDefaultString("ZVELO_PASSWORD", ""), "Password to obtain a token with [$ZVELO_PASSWORD]")
+	flag.DurationVar(&zClient.PollTimeout, "timeout", zapi.DefaultPollTimeout, "timeout after this much time has elapsed")
+	flag.DurationVar(&zClient.PollInterval, "interval", zapi.DefaultPollInterval, "amount of time between polling requests")
 }
 
 func main() {
@@ -44,18 +45,18 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := fn(); err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
+	if fn != nil {
+		if err := fn(); err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			os.Exit(1)
+		}
 	}
 }
 
-func usageCmds() string {
-	ret := []string{}
+func printCmdUsage() {
 	for name, sc := range cmd {
-		ret = append(ret, fmt.Sprintf("  %s\n        %s", name, sc.Usage))
+		fmt.Fprintf(os.Stderr, "  %s\n        %s\n", name, sc.Usage)
 	}
-	return strings.Join(ret, "\n")
 }
 
 func getDefaultString(envVar, fallback string) string {
@@ -84,24 +85,46 @@ func getDefaultBool(envVar string) bool {
 func parseFlags() (func() error, error) {
 	// parse global flags
 	flag.Parse()
+	if err := setupGlobal(); err != nil {
+		flag.PrintDefaults()
+		printCmdUsage()
+		return nil, err
+	}
 
 	// parse command
 	if len(flag.Args()) == 0 {
 		flag.PrintDefaults()
-		return nil, fmt.Errorf("%s\ncommand is required", usageCmds())
+		printCmdUsage()
+		return nil, fmt.Errorf("command is required")
 	}
 
 	sc, ok := cmd[flag.Args()[0]]
 	if !ok {
-		return nil, fmt.Errorf("%s\ninvalid command", usageCmds())
+		printCmdUsage()
+		return nil, fmt.Errorf("invalid command")
 	}
 
-	_ = sc.FlagSet.Parse(flag.Args()[1:])
+	if sc.FlagSet != nil {
+		_ = sc.FlagSet.Parse(flag.Args()[1:])
+	}
 
-	if err := sc.Setup(); err != nil {
-		sc.FlagSet.PrintDefaults()
-		return nil, err
+	if sc.Setup != nil {
+		if err := sc.Setup(); err != nil {
+			if sc.FlagSet != nil {
+				sc.FlagSet.PrintDefaults()
+			}
+			return nil, err
+		}
 	}
 
 	return sc.Action, nil
+}
+
+func setupGlobal() error {
+	if len(zClient.Token) == 0 &&
+		(len(zClient.Username) == 0 || len(zClient.Password) == 0) {
+		return fmt.Errorf("-token or -username and -password are required")
+	}
+
+	return nil
 }
