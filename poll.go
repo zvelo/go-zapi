@@ -54,7 +54,7 @@ func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
 	return result, nil
 }
 
-func (c Client) Poll(reqID []byte, interval time.Duration, errCh chan<- error) <-chan *zapitype.QueryResult {
+func (c Client) Poll(reqID []byte, errCh chan<- error) <-chan *zapitype.QueryResult {
 	ch := make(chan *zapitype.QueryResult, 1)
 
 	poll := func() bool {
@@ -75,8 +75,17 @@ func (c Client) Poll(reqID []byte, interval time.Duration, errCh chan<- error) <
 			return
 		}
 
-		for range time.Tick(interval) {
-			if poll() {
+		tick := time.Tick(c.PollInterval)
+		timeout := time.After(c.PollTimeout)
+
+		for {
+			select {
+			case <-tick:
+				if poll() {
+					return
+				}
+			case <-timeout:
+				close(ch)
 				return
 			}
 		}

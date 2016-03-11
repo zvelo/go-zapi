@@ -4,15 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"time"
 
+	"github.com/zvelo/go-zapi"
 	"github.com/zvelo/go-zapi/zapitype"
 )
 
-var pollConfig = struct {
-	URL     string
-	Timeout time.Duration
-}{}
+var pollURLs []string
 
 func init() {
 	fs := flag.NewFlagSet("poll", flag.ExitOnError)
@@ -20,8 +17,8 @@ func init() {
 	fs.StringVar(&zClient.Username, "username", getDefaultString("ZVELO_USERNAME", ""), "Username to obtain a token as [$ZVELO_USERNAME]")
 	fs.StringVar(&zClient.Password, "password", getDefaultString("ZVELO_PASSWORD", ""), "Password to obtain a token with [$ZVELO_PASSWORD]")
 	fs.StringVar(&zClient.Token, "token", getDefaultString("ZVELO_TOKEN", ""), "Token for making the query [$ZVELO_TOKEN]")
-	fs.StringVar(&pollConfig.URL, "url", "", "URL to query")
-	fs.DurationVar(&pollConfig.Timeout, "timeout", 15*time.Minute, "timeout after this much time has elapsed")
+	fs.DurationVar(&zClient.PollTimeout, "timeout", zapi.DefaultPollTimeout, "timeout after this much time has elapsed")
+	fs.DurationVar(&zClient.PollInterval, "interval", zapi.DefaultPollInterval, "amount of time between polling requests")
 
 	cmd["poll"] = subcommand{
 		FlagSet: fs,
@@ -37,8 +34,10 @@ func setupPoll() error {
 		return fmt.Errorf("-token or -username and -password are required")
 	}
 
-	if len(pollConfig.URL) == 0 {
-		return fmt.Errorf("-url is required")
+	pollURLs = cmd["poll"].FlagSet.Args()
+
+	if len(pollURLs) == 0 {
+		return fmt.Errorf("at least one url is required")
 	}
 
 	return nil
@@ -46,7 +45,7 @@ func setupPoll() error {
 
 func pollURL() error {
 	reply, err := zClient.Query(&zapitype.QueryURLRequests{
-		URLs: []string{pollConfig.URL},
+		URLs: pollURLs,
 		DataSets: []zapitype.DataSetType{
 			zapitype.DataSetTypeCategorization,
 			zapitype.DataSetTypeAdFraud,
@@ -59,18 +58,19 @@ func pollURL() error {
 	// TODO(jrubin) assert(len(reply.RequestIDs) == 1)
 
 	errCh := make(chan error)
-	resultCh := zClient.Poll(reply.RequestIDs[0], 15*time.Second, errCh)
-	timeoutCh := time.After(pollConfig.Timeout)
+	resultCh := zClient.Poll(reply.RequestIDs[0], errCh)
 
 	for {
 		select {
 		case err := <-errCh:
 			fmt.Println(err) // TODO(jrubin)
-		case result := <-resultCh:
+		case result, ok := <-resultCh:
+			if !ok {
+				fmt.Fprintf(os.Stderr, "timeout\n")
+				return nil
+			}
+
 			fmt.Println(result) // TODO(jrubin)
-			return nil
-		case <-timeoutCh:
-			fmt.Fprintf(os.Stderr, "timeout\n")
 			return nil
 		}
 	}

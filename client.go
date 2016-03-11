@@ -9,14 +9,17 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 )
 
 const (
-	APIVersion       = "v1"
-	DefaultEndpoint  = "https://api.zvelo.com"
-	DefaultUserAgent = "go-zapi v1"
-	tokenPath        = "auth/token"
-	urlPath          = "queries/url"
+	APIVersion          = "v1"
+	DefaultEndpoint     = "https://api.zvelo.com"
+	DefaultUserAgent    = "go-zapi v1"
+	DefaultPollInterval = 15 * time.Second
+	DefaultPollTimeout  = 15 * time.Minute
+	tokenPath           = "auth/token"
+	urlPath             = "queries/url"
 )
 
 type Doer interface {
@@ -30,13 +33,17 @@ type Client struct {
 	HTTPClient         Doer
 	Debug              bool
 	UserAgent          string
+	PollInterval       time.Duration
+	PollTimeout        time.Duration
 }
 
 func New() *Client {
 	ret := &Client{
-		UserAgent:  DefaultUserAgent,
-		Endpoint:   DefaultEndpoint,
-		HTTPClient: &http.Client{},
+		UserAgent:    DefaultUserAgent,
+		Endpoint:     DefaultEndpoint,
+		PollInterval: DefaultPollInterval,
+		PollTimeout:  DefaultPollTimeout,
+		HTTPClient:   &http.Client{},
 	}
 
 	return ret
