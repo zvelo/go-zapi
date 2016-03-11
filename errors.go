@@ -3,6 +3,8 @@ package zapi
 import (
 	"fmt"
 	"net/http"
+
+	"github.com/zvelo/go-zapi/zapitype"
 )
 
 var (
@@ -33,7 +35,7 @@ func (e errContentType) Error() string {
 	return fmt.Sprintf("unexpected content type: %s", string(e))
 }
 
-type ErrIncompleteResult QueryResult
+type ErrIncompleteResult zapitype.QueryResult
 
 func (e ErrIncompleteResult) Error() string {
 	return "incomplete result"

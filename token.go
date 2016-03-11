@@ -5,7 +5,15 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 )
+
+type token struct {
+	AccessToken  string    `json:"access_token"`
+	TokenType    string    `json:"token_type,omitempty"`
+	RefreshToken string    `json:"refresh_token,omitempty"`
+	Expiry       time.Time `json:"expiry,omitempty"`
+}
 
 func (c *Client) GetToken() error {
 	if len(c.Username) == 0 {

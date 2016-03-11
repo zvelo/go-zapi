@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/zvelo/go-zapi"
+	"github.com/zvelo/go-zapi/zapitype"
 )
 
 var pollConfig = struct {
@@ -45,11 +45,11 @@ func setupPoll() error {
 }
 
 func pollURL() error {
-	reply, err := zClient.Query(&zapi.QueryURLRequests{
+	reply, err := zClient.Query(&zapitype.QueryURLRequests{
 		URLs: []string{pollConfig.URL},
-		DataSets: []zapi.DataSetType{
-			zapi.DataSetTypeCategorization,
-			zapi.DataSetTypeAdFraud,
+		DataSets: []zapitype.DataSetType{
+			zapitype.DataSetTypeCategorization,
+			zapitype.DataSetTypeAdFraud,
 		},
 	})
 	if err != nil {

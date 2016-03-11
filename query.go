@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/zvelo/go-zapi/zapitype"
 )
 
 const (
@@ -36,7 +38,7 @@ func massageURLs(urls []string) ([]string, error) {
 	return ret, nil
 }
 
-func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
+func (c Client) Query(query *zapitype.QueryURLRequests) (*zapitype.QueryReply, error) {
 	if query == nil {
 		return nil, errNilRequest
 	}
@@ -99,7 +101,7 @@ func (c Client) Query(query *QueryURLRequests) (*QueryReply, error) {
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-	reply := &QueryReply{}
+	reply := &zapitype.QueryReply{}
 	if err = decoder.Decode(reply); err != nil {
 		return nil, errDecodeJSON(err.Error())
 	}

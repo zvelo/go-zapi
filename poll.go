@@ -6,9 +6,11 @@ import (
 	"net/http"
 	"path"
 	"time"
+
+	"github.com/zvelo/go-zapi/zapitype"
 )
 
-func (c Client) PollOnce(reqID []byte) (*QueryResult, error) {
+func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
 	b64ReqID := base64.RawURLEncoding.EncodeToString(reqID[:])
 
 	queryEndpoint, err := c.endpointURL(path.Join(urlPath, b64ReqID))
@@ -39,7 +41,7 @@ func (c Client) PollOnce(reqID []byte) (*QueryResult, error) {
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-	result := &QueryResult{}
+	result := &zapitype.QueryResult{}
 	if err = decoder.Decode(result); err != nil {
 		return nil, errDecodeJSON(err.Error())
 	}
@@ -52,8 +54,8 @@ func (c Client) PollOnce(reqID []byte) (*QueryResult, error) {
 	return result, nil
 }
 
-func (c Client) Poll(reqID []byte, interval time.Duration, errCh chan<- error) <-chan *QueryResult {
-	ch := make(chan *QueryResult, 1)
+func (c Client) Poll(reqID []byte, interval time.Duration, errCh chan<- error) <-chan *zapitype.QueryResult {
+	ch := make(chan *zapitype.QueryResult, 1)
 
 	poll := func() bool {
 		result, err := c.PollOnce(reqID)

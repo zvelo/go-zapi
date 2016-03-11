@@ -1,13 +1,4 @@
-package zapi
-
-import "time"
-
-type token struct {
-	AccessToken  string    `json:"access_token"`
-	TokenType    string    `json:"token_type,omitempty"`
-	RefreshToken string    `json:"refresh_token,omitempty"`
-	Expiry       time.Time `json:"expiry,omitempty"`
-}
+package zapitype
 
 type DataSetType string
 
