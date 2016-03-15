@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/zvelo/go-zapi/zapitype"
+	"zvelo.io/go-zapi/zapitype"
 )
 
 var pollURLs []string

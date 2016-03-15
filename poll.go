@@ -7,7 +7,7 @@ import (
 	"path"
 	"time"
 
-	"github.com/zvelo/go-zapi/zapitype"
+	"zvelo.io/go-zapi/zapitype"
 )
 
 func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {

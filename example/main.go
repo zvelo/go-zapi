@@ -6,7 +6,7 @@ import (
 	"os"
 	"strconv"
 
-	"github.com/zvelo/go-zapi"
+	"zvelo.io/go-zapi"
 )
 
 type subcommand struct {

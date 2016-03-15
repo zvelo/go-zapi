@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/zvelo/go-zapi/zapitype"
+	"zvelo.io/go-zapi/zapitype"
 )
 
 const (

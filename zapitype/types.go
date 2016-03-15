@@ -1,4 +1,4 @@
-package zapitype
+package zapitype // import "zvelo.io/go-zapi/zapitype"
 
 type DataSetType string
 
