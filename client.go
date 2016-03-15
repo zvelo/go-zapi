@@ -1,4 +1,4 @@
-package zapi
+package zapi // import "zvelo.io/go-zapi"
 
 import (
 	"fmt"
