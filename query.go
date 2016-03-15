@@ -1,18 +1,10 @@
 package zapi
 
 import (
-	"bytes"
-	"encoding/json"
-	"net/http"
 	"net/url"
 	"strings"
 
 	"zvelo.io/msg/go-msg"
-)
-
-const (
-	contentTypeQueryReq  = "application/vnd.zvelo.query+json"
-	contentTypeQueryResp = "application/vnd.zvelo.query-reply+json"
 )
 
 func massageURLs(urls []string) ([]string, error) {
@@ -36,6 +28,29 @@ func massageURLs(urls []string) ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+func (c Client) queryHandler() (handler, error) {
+	queryEndpoint, err := c.endpointURL(urlPath)
+	if err != nil {
+		return nil, err
+	}
+
+	r := req{
+		ContentType: "application/vnd.zvelo.query",
+		Accept:      "application/vnd.zvelo.query-reply",
+		URL:         queryEndpoint.String(),
+		Method:      "POST",
+	}
+
+	if c.JSON {
+		r.ContentType += "+json"
+		r.Accept += "+json"
+
+		return jsonHandler{req: r}, nil
+	}
+
+	return pbHandler{req: r}, nil
 }
 
 func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
@@ -63,25 +78,18 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 		}
 	}
 
-	data, err := json.Marshal(query)
+	h, err := c.queryHandler()
 	if err != nil {
 		return nil, err
 	}
 
-	queryEndpoint, err := c.endpointURL(urlPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryEndpoint.String(), bytes.NewBuffer(data))
+	req, err := h.PrepareReq(query)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Content-Type", contentTypeQueryReq)
-	req.Header.Set("Accept", contentTypeQueryResp)
 
 	c.debugRequest(req)
 
@@ -97,14 +105,13 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 		return nil, errStatusCode(resp.StatusCode)
 	}
 
-	if ct := resp.Header.Get("Content-Type"); ct != contentTypeQueryResp {
+	if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
 		return nil, errContentType(ct)
 	}
 
-	decoder := json.NewDecoder(resp.Body)
 	reply := &msg.QueryReply{}
-	if err = decoder.Decode(reply); err != nil {
-		return nil, errDecodeJSON(err.Error())
+	if err = h.ParseResp(resp.Body, reply); err != nil {
+		return nil, err
 	}
 
 	if len(reply.RequestId) == 0 {

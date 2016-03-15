@@ -84,6 +84,13 @@ func init() {
 		zapi.DefaultPollInterval,
 		"amount of time between polling requests",
 	)
+
+	flag.BoolVar(
+		&zClient.JSON,
+		"json",
+		getDefaultBool("ZVELO_JSON"),
+		"Use json instead of protocol buffers for api requests [$ZVELO_JSON]",
+	)
 }
 
 func main() {

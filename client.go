@@ -35,6 +35,7 @@ type Client struct {
 	UserAgent          string
 	PollInterval       time.Duration
 	PollTimeout        time.Duration
+	JSON               bool
 }
 
 func New() *Client {
