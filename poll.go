@@ -30,6 +30,7 @@ func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Accept", "application/vnd.zvelo.query-result+json")
 
 	c.debugRequest(req)

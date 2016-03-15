@@ -61,10 +61,6 @@ func (c Client) endpointURL(p string) (*url.URL, error) {
 
 	ret.Path = path.Join(ret.Path, APIVersion, p)
 
-	if len(c.Token) > 0 {
-		ret.RawQuery = url.Values{"access_token": {c.Token}}.Encode()
-	}
-
 	return ret, nil
 }
 

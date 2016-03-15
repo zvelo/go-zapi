@@ -79,6 +79,7 @@ func (c Client) Query(query *zapitype.QueryURLRequests) (*zapitype.QueryReply, e
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Content-Type", contentTypeQueryReq)
 	req.Header.Set("Accept", contentTypeQueryResp)
 
