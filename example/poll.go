@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"zvelo.io/go-zapi/zapitype"
+	"zvelo.io/msg/go-msg"
 )
 
 var pollURLs []string
@@ -33,11 +33,11 @@ func setupPoll() error {
 }
 
 func pollURL() error {
-	reply, err := zClient.Query(&zapitype.QueryURLRequests{
-		URLs: pollURLs,
-		DataSets: []zapitype.DataSetType{
-			zapitype.DataSetTypeCategorization,
-			zapitype.DataSetTypeAdFraud,
+	reply, err := zClient.Query(&msg.QueryURLRequests{
+		Url: pollURLs,
+		Dataset: []msg.DataSetType{
+			msg.DataSetType_CATEGORIZATION,
+			msg.DataSetType_ADFRAUD,
 		},
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func pollURL() error {
 	errCh := make(chan error)
 
 	// TODO(jrubin) only poll for the first reqid?
-	resultCh := zClient.Poll(reply.RequestIDs[0], errCh)
+	resultCh := zClient.Poll(reply.RequestId[0], errCh)
 
 	for {
 		select {

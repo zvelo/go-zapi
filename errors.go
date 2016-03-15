@@ -3,6 +3,8 @@ package zapi
 import (
 	"fmt"
 	"net/http"
+
+	"zvelo.io/msg/go-msg"
 )
 
 var (
@@ -31,4 +33,10 @@ type errContentType string
 
 func (e errContentType) Error() string {
 	return fmt.Sprintf("unexpected content type: %s", string(e))
+}
+
+type ErrIncompleteResult msg.QueryResult
+
+func (e ErrIncompleteResult) Error() string {
+	return "incomplete result"
 }

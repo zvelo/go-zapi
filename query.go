@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"zvelo.io/go-zapi/zapitype"
+	"zvelo.io/msg/go-msg"
 )
 
 const (
@@ -38,22 +38,22 @@ func massageURLs(urls []string) ([]string, error) {
 	return ret, nil
 }
 
-func (c Client) Query(query *zapitype.QueryURLRequests) (*zapitype.QueryReply, error) {
+func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 	if query == nil {
 		return nil, errNilRequest
 	}
 
 	var err error
-	query.URLs, err = massageURLs(query.URLs)
+	query.Url, err = massageURLs(query.Url)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(query.URLs) == 0 {
+	if len(query.Url) == 0 {
 		return nil, errMissingURL
 	}
 
-	if len(query.DataSets) == 0 {
+	if len(query.Dataset) == 0 {
 		return nil, errMissingDataSet
 	}
 
@@ -102,12 +102,12 @@ func (c Client) Query(query *zapitype.QueryURLRequests) (*zapitype.QueryReply, e
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-	reply := &zapitype.QueryReply{}
+	reply := &msg.QueryReply{}
 	if err = decoder.Decode(reply); err != nil {
 		return nil, errDecodeJSON(err.Error())
 	}
 
-	if len(reply.RequestIDs) == 0 {
+	if len(reply.RequestId) == 0 {
 		return nil, errMissingRequestID
 	}
 

@@ -7,10 +7,10 @@ import (
 	"path"
 	"time"
 
-	"zvelo.io/go-zapi/zapitype"
+	"zvelo.io/msg/go-msg"
 )
 
-func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
+func (c Client) PollOnce(reqID []byte) (*msg.QueryResult, error) {
 	if len(c.Token) == 0 {
 		if err := c.GetToken(); err != nil {
 			return nil, err
@@ -48,21 +48,21 @@ func (c Client) PollOnce(reqID []byte) (*zapitype.QueryResult, error) {
 	}
 
 	decoder := json.NewDecoder(resp.Body)
-	result := &zapitype.QueryResult{}
+	result := &msg.QueryResult{}
 	if err = decoder.Decode(result); err != nil {
 		return nil, errDecodeJSON(err.Error())
 	}
 
 	// TODO(jrubin) is this the right way to test for poll completion?
 	if result.Status == nil {
-		return nil, zapitype.ErrIncompleteResult(*result)
+		return nil, ErrIncompleteResult(*result)
 	}
 
 	return result, nil
 }
 
-func (c Client) Poll(reqID []byte, errCh chan<- error) <-chan *zapitype.QueryResult {
-	ch := make(chan *zapitype.QueryResult, 1)
+func (c Client) Poll(reqID []byte, errCh chan<- error) <-chan *msg.QueryResult {
+	ch := make(chan *msg.QueryResult, 1)
 
 	poll := func() bool {
 		result, err := c.PollOnce(reqID)

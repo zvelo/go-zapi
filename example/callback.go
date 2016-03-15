@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"zvelo.io/go-zapi/zapitype"
+	"zvelo.io/msg/go-msg"
 )
 
 const (
@@ -90,13 +90,13 @@ func callbackURL() error {
 	go http.ListenAndServe(callbackConfig.ListenAddress, nil)
 
 	// TODO(jrubin) how to ensure callback comes from zvelo and isn't forged?
-	reply, err := zClient.Query(&zapitype.QueryURLRequests{
-		URLs: callbackConfig.URLs,
-		DataSets: []zapitype.DataSetType{
-			zapitype.DataSetTypeCategorization,
-			zapitype.DataSetTypeAdFraud,
+	reply, err := zClient.Query(&msg.QueryURLRequests{
+		Url: callbackConfig.URLs,
+		Dataset: []msg.DataSetType{
+			msg.DataSetType_CATEGORIZATION,
+			msg.DataSetType_ADFRAUD,
 		},
-		CallbackURL:    callbackConfig.CallbackURL,
+		Callback:       callbackConfig.CallbackURL,
 		PartialResults: callbackConfig.PartialResults,
 	})
 	if err != nil {
