@@ -18,17 +18,15 @@ const (
 	callbackDefaultTimeout       = 15 * time.Minute
 )
 
-var (
-	queryURLs []string
-	queryPoll bool
-	handler   callbackHandler
-)
+var handler callbackHandler
 
 type callbackHandler struct {
 	config struct {
+		URLs                       []string
 		ListenAddress, CallbackURL string
 		Timeout                    time.Duration
 		PartialResults             bool
+		Poll                       bool
 	}
 	doneCh chan *http.Request // TODO(jrubin)
 }
@@ -37,7 +35,7 @@ func init() {
 	fs := flag.NewFlagSet("query", flag.ExitOnError)
 	fs.Usage = cmdUsage(fs, "url [url...]")
 
-	fs.BoolVar(&queryPoll, "poll", getDefaultBool("ZVELO_POLL"), "poll for results [$ZVELO_POLL]")
+	fs.BoolVar(&handler.config.Poll, "poll", getDefaultBool("ZVELO_POLL"), "poll for results [$ZVELO_POLL]")
 
 	fs.StringVar(
 		&handler.config.ListenAddress,
@@ -76,18 +74,18 @@ func init() {
 }
 
 func setupQuery() error {
-	if queryPoll && len(handler.config.CallbackURL) > 0 {
+	if handler.config.Poll && len(handler.config.CallbackURL) > 0 {
 		return fmt.Errorf("poll and callback can't both be true")
 	}
 
 	if len(handler.config.CallbackURL) > 0 {
 		handler.doneCh = make(chan *http.Request, 1) // TODO(jrubin)
-		go http.ListenAndServe(handler.config.ListenAddress, handler)
+		go func() { _ = http.ListenAndServe(handler.config.ListenAddress, handler) }()
 	}
 
-	queryURLs = cmd["query"].FlagSet.Args()
+	handler.config.URLs = cmd["query"].FlagSet.Args()
 
-	if len(queryURLs) == 0 {
+	if len(handler.config.URLs) == 0 {
 		return fmt.Errorf("at least one url is required")
 	}
 
@@ -96,7 +94,7 @@ func setupQuery() error {
 
 func queryURL() error {
 	req := &msg.QueryURLRequests{
-		Url: queryURLs,
+		Url: handler.config.URLs,
 		Dataset: []msg.DataSetType{
 			msg.DataSetType_CATEGORIZATION,
 			msg.DataSetType_ADFRAUD,
@@ -118,7 +116,7 @@ func queryURL() error {
 	// TODO(jrubin) check reply.Status?
 	// TODO(jrubin) assert(len(reply.RequestIDs) > 0)
 
-	if queryPoll {
+	if handler.config.Poll {
 		return pollForResults(reply)
 	}
 
