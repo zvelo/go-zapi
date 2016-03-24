@@ -91,7 +91,7 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 
-	c.debugRequest(req)
+	c.debugRequestOut(req)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {

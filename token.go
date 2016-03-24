@@ -39,7 +39,7 @@ func (c *Client) GetToken() error {
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	c.debugRequest(req)
+	c.debugRequestOut(req)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {

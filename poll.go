@@ -33,7 +33,7 @@ func (c Client) PollOnce(reqID []byte) (*msg.QueryResult, error) {
 	req.Header.Set("Authorization", "Bearer "+c.Token)
 	req.Header.Set("Accept", "application/vnd.zvelo.query-result+json")
 
-	c.debugRequest(req)
+	c.debugRequestOut(req)
 
 	resp, err := c.HTTPClient.Do(req)
 	if err != nil {

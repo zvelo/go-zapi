@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -8,48 +9,48 @@ import (
 	"zvelo.io/msg/go-msg"
 )
 
-var pollURLs []string
+var requestID []byte
+var pollOnce bool
 
 func init() {
 	fs := flag.NewFlagSet("poll", flag.ExitOnError)
-	fs.Usage = cmdUsage(fs, "url [url...]")
+	fs.Usage = cmdUsage(fs, "request_id")
+
+	fs.BoolVar(&pollOnce, "once", getDefaultBool("POLL_ONCE"), "make just a single poll request [$ZVELO_POLL_ONCE]")
 
 	cmd["poll"] = subcommand{
 		FlagSet: fs,
 		Setup:   setupPoll,
 		Action:  pollURL,
-		Usage:   "query url using polling",
+		Usage:   "poll for results with a request_id",
 	}
 }
 
 func setupPoll() error {
-	pollURLs = cmd["poll"].FlagSet.Args()
+	str := cmd["poll"].FlagSet.Arg(0)
 
-	if len(pollURLs) == 0 {
-		return fmt.Errorf("at least one url is required")
+	if len(str) == 0 {
+		return fmt.Errorf("request_id is required")
 	}
 
-	return nil
+	var err error
+	requestID, err = base64.StdEncoding.DecodeString(str)
+
+	return err
 }
 
 func pollURL() error {
-	reply, err := zClient.Query(&msg.QueryURLRequests{
-		Url: pollURLs,
-		Dataset: []msg.DataSetType{
-			msg.DataSetType_CATEGORIZATION,
-			msg.DataSetType_ADFRAUD,
-		},
-	})
-	if err != nil {
-		return err
+	if pollOnce {
+		result, err := zClient.PollOnce(requestID)
+		if err != nil {
+			return err
+		}
+
+		return handlePollResult(result)
 	}
 
-	// TODO(jrubin) assert(len(reply.RequestIDs) > 0)
-
 	errCh := make(chan error)
-
-	// TODO(jrubin) only poll for the first reqid?
-	resultCh := zClient.Poll(reply.RequestId[0], errCh)
+	resultCh := zClient.Poll(requestID, errCh)
 
 	for {
 		select {
@@ -61,8 +62,12 @@ func pollURL() error {
 				return nil
 			}
 
-			fmt.Println(result) // TODO(jrubin)
-			return nil
+			return handlePollResult(result)
 		}
 	}
+}
+
+func handlePollResult(result *msg.QueryResult) error {
+	fmt.Println(result) // TODO(jrubin)
+	return nil
 }
