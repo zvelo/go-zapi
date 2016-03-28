@@ -16,4 +16,4 @@ dependencies:
 test:
   post:
     - go test -v -coverprofile=profile.out
-    - goveralls -v -coverprofile=profile.out -service $CI_SERVICE -repotoken $COVERALLS_REPO_TOKEN || true
+    - goveralls -v -coverprofile=profile.out -service circle-ci -repotoken $COVERALLS_REPO_TOKEN || true

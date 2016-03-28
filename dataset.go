@@ -39,10 +39,7 @@ func DataSetByType(ds *msg.DataSet, dsType msg.DataSetType) (interface{}, error)
 
 	name = strings.ToLower(name)
 	v := reflect.ValueOf(*ds).FieldByNameFunc(func(val string) bool {
-		if strings.ToLower(val) == name {
-			return true
-		}
-		return false
+		return strings.ToLower(val) == name
 	})
 
 	if v.IsValid() {
