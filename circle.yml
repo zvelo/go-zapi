@@ -7,5 +7,4 @@ checkout:
 
 dependencies:
   post:
-    - example:
-      cd example && go build -v
+    - cd example && go build -v
