@@ -4,3 +4,8 @@ checkout:
     - mkdir -p $HOME/.go_workspace/src/zvelo.io
     - mv $HOME/$CIRCLE_PROJECT_REPONAME $HOME/.go_workspace/src/zvelo.io
     - ln -s $HOME/.go_workspace/src/zvelo.io/$CIRCLE_PROJECT_REPONAME $HOME/$CIRCLE_PROJECT_REPONAME
+
+dependencies:
+  post:
+    - example:
+      cd example && go build -v
