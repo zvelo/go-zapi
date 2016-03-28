@@ -57,7 +57,7 @@ func (c Client) PollOnce(reqID []byte, dsts []msg.DataSetType) (*msg.QueryResult
 
 	complete := true
 	for _, dst := range dsts {
-		i, err := DataSetByType(result.ResponseDataset, dst)
+		i, err := result.ResponseDataset.FieldByType(dst)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error checking result: %s\n", err)
 			continue
