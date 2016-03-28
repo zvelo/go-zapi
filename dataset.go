@@ -37,14 +37,16 @@ func DataSetByType(ds *msg.DataSet, dsType msg.DataSetType) (interface{}, error)
 		return nil, ErrNilDataSet
 	}
 
-	v := reflect.ValueOf(*ds)
-	t := v.Type()
-	for i := 0; i < v.NumField(); i++ {
-		if strings.ToLower(t.Field(i).Name) != strings.ToLower(name) {
-			continue
+	name = strings.ToLower(name)
+	v := reflect.ValueOf(*ds).FieldByNameFunc(func(val string) bool {
+		if strings.ToLower(val) == name {
+			return true
 		}
+		return false
+	})
 
-		return v.Field(i).Interface(), nil
+	if v.IsValid() {
+		return v.Interface(), nil
 	}
 
 	// NOTE: if this is reached, it indicates a problem where a valid
