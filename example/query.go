@@ -96,6 +96,7 @@ func queryURL() error {
 	req := &msg.QueryURLRequests{
 		Url: handler.config.URLs,
 		Dataset: []msg.DataSetType{
+			// TODO(jrubin) get datasets from cmdline
 			msg.DataSetType_CATEGORIZATION,
 			msg.DataSetType_ADFRAUD,
 		},
@@ -138,7 +139,11 @@ func pollForResults(reply *msg.QueryReply) error {
 	errCh := make(chan error)
 
 	// TODO(jrubin) only poll for the first reqid?
-	resultCh := zClient.Poll(reply.RequestId[0], errCh)
+	resultCh := zClient.Poll(reply.RequestId[0], []msg.DataSetType{
+		// TODO(jrubin) get datasets from cmdline
+		msg.DataSetType_CATEGORIZATION,
+		msg.DataSetType_ADFRAUD,
+	}, errCh)
 
 	for {
 		select {

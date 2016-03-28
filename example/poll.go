@@ -40,8 +40,14 @@ func setupPoll() error {
 }
 
 func pollURL() error {
+	dsts := []msg.DataSetType{
+		// TODO(jrubin) get datasets from cmdline
+		msg.DataSetType_CATEGORIZATION,
+		msg.DataSetType_ADFRAUD,
+	}
+
 	if pollOnce {
-		result, err := zClient.PollOnce(requestID)
+		result, err := zClient.PollOnce(requestID, dsts)
 		if err != nil {
 			return err
 		}
@@ -50,7 +56,7 @@ func pollURL() error {
 	}
 
 	errCh := make(chan error)
-	resultCh := zClient.Poll(requestID, errCh)
+	resultCh := zClient.Poll(requestID, dsts, errCh)
 
 	for {
 		select {

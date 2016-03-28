@@ -3,14 +3,16 @@ package zapi
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"path"
 	"time"
 
 	"zvelo.io/msg/go-msg"
 )
 
-func (c Client) PollOnce(reqID []byte) (*msg.QueryResult, error) {
+func (c Client) PollOnce(reqID []byte, dsts []msg.DataSetType) (*msg.QueryResult, error) {
 	if len(c.Token) == 0 {
 		if err := c.GetToken(); err != nil {
 			return nil, err
@@ -53,19 +55,35 @@ func (c Client) PollOnce(reqID []byte) (*msg.QueryResult, error) {
 		return nil, errDecodeJSON(err.Error())
 	}
 
+	complete := true
+	for _, dst := range dsts {
+		i, err := DataSetByType(result.ResponseDataset, dst)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error checking result: %s\n", err)
+			continue
+		}
+
+		if i == nil {
+			fmt.Fprintf(os.Stderr, "still missing %s dataset\n", dst)
+			complete = false
+		} else {
+			fmt.Fprintf(os.Stderr, "got %s dataset\n", dst)
+		}
+	}
+
 	// TODO(jrubin) is this the right way to test for poll completion?
-	if result.Status == nil {
+	if !complete {
 		return nil, ErrIncompleteResult(*result)
 	}
 
 	return result, nil
 }
 
-func (c Client) Poll(reqID []byte, errCh chan<- error) <-chan *msg.QueryResult {
+func (c Client) Poll(reqID []byte, dsts []msg.DataSetType, errCh chan<- error) <-chan *msg.QueryResult {
 	ch := make(chan *msg.QueryResult, 1)
 
 	poll := func() bool {
-		result, err := c.PollOnce(reqID)
+		result, err := c.PollOnce(reqID, dsts)
 		if err != nil {
 			if errCh != nil {
 				errCh <- err
