@@ -48,7 +48,7 @@ func init() {
 		&handler.config.CallbackURL,
 		"callback-url",
 		getDefaultString("ZVELO_CALLBACK_URL", ""),
-		"publicly accessible base URL that routes to the address used by the address flag [$ZVELO_CALLBACK_URL]",
+		"publicly accessible base URL that routes to the address used by the -listen-address flag [$ZVELO_CALLBACK_URL]",
 	)
 
 	fs.DurationVar(
