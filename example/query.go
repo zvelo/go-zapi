@@ -17,7 +17,11 @@ const (
 	callbackDefaultTimeout       = 15 * time.Minute
 )
 
-var handler callbackHandler
+var (
+	handler  callbackHandler
+	dataset  string
+	datasets = []msg.DataSetType{}
+)
 
 type callbackHandler struct {
 	config struct {
@@ -64,6 +68,24 @@ func init() {
 		"request that datasets be delivered as soon as they become available instead of waiting for all datasets to become available before responding",
 	)
 
+	allDatasets := make([]string, len(msg.DataSetType_name)-1)
+	i := 0
+	for dst, name := range msg.DataSetType_name {
+		if dst == int32(msg.DataSetType_ECHO) {
+			continue
+		}
+
+		allDatasets[i] = name
+		i++
+	}
+
+	fs.StringVar(
+		&dataset,
+		"dataset",
+		getDefaultString("ZVELO_DATASET", "CATEGORIZATION"),
+		"comma separated list of datasets to retrieve (available options: "+strings.Join(allDatasets, ", ")+") [$ZVELO_DATASET]",
+	)
+
 	cmd["query"] = subcommand{
 		FlagSet: fs,
 		Setup:   setupQuery,
@@ -88,17 +110,27 @@ func setupQuery() error {
 		return fmt.Errorf("at least one url is required")
 	}
 
+	for _, dsName := range strings.Split(dataset, ",") {
+		dsName = strings.TrimSpace(dsName)
+		dst, err := msg.NewDataSetType(dsName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid dataset type: %s\n", dsName)
+			continue
+		}
+		datasets = append(datasets, dst)
+	}
+
+	if len(datasets) == 0 {
+		return fmt.Errorf("at least one valid dataset is required")
+	}
+
 	return nil
 }
 
 func queryURL() error {
 	req := &msg.QueryURLRequests{
-		Url: handler.config.URLs,
-		Dataset: []msg.DataSetType{
-			// TODO(jrubin) get datasets from cmdline
-			msg.DataSetType_CATEGORIZATION,
-			msg.DataSetType_ADFRAUD,
-		},
+		Url:     handler.config.URLs,
+		Dataset: datasets,
 	}
 
 	if len(handler.config.CallbackURL) > 0 {
