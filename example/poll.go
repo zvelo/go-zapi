@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"os"
@@ -9,7 +8,7 @@ import (
 	"zvelo.io/msg/go-msg"
 )
 
-var requestID []byte
+var requestID string
 var pollOnce bool
 
 func init() {
@@ -27,53 +26,44 @@ func init() {
 }
 
 func setupPoll() error {
-	str := cmd["poll"].FlagSet.Arg(0)
+	requestID = cmd["poll"].FlagSet.Arg(0)
 
-	if len(str) == 0 {
+	if len(requestID) == 0 {
 		return fmt.Errorf("request_id is required")
 	}
 
-	var err error
-	requestID, err = base64.StdEncoding.DecodeString(str)
-
-	return err
+	return nil
 }
 
 func pollURL() error {
-	dsts := []msg.DataSetType{
-		// TODO(jrubin) get datasets from cmdline
-		msg.DataSetType_CATEGORIZATION,
-		msg.DataSetType_ADFRAUD,
-	}
-
 	if pollOnce {
-		result, err := zClient.PollOnce(requestID, dsts)
+		result, err := zClient.PollOnce(requestID)
 		if err != nil {
 			return err
 		}
 
-		return handlePollResult(result)
+		return handleResult(result)
 	}
 
 	errCh := make(chan error)
-	resultCh := zClient.Poll(requestID, dsts, errCh)
+	resultCh := zClient.Poll(requestID, errCh)
 
 	for {
 		select {
 		case err := <-errCh:
-			fmt.Println(err) // TODO(jrubin)
+			fmt.Fprintf(os.Stderr, "%s\n", err) // TODO(jrubin)
 		case result, ok := <-resultCh:
 			if !ok {
 				fmt.Fprintf(os.Stderr, "timeout\n")
 				return nil
 			}
 
-			return handlePollResult(result)
+			return handleResult(result)
 		}
 	}
 }
 
-func handlePollResult(result *msg.QueryResult) error {
+func handleResult(result *msg.QueryResult) error {
 	fmt.Println(result) // TODO(jrubin)
 	return nil
 }

@@ -1,6 +1,7 @@
 package zapi
 
 import (
+	"net/http"
 	"net/url"
 	"strings"
 
@@ -101,7 +102,7 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 
 	c.debugResponse(resp)
 
-	if resp.StatusCode != 201 {
+	if resp.StatusCode != http.StatusCreated {
 		return nil, errStatusCode(resp.StatusCode)
 	}
 
@@ -112,6 +113,10 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 	reply := &msg.QueryReply{}
 	if err = h.ParseResp(resp.Body, reply); err != nil {
 		return nil, err
+	}
+
+	if reply.Status == nil || int(reply.Status.Code) != resp.StatusCode {
+		return nil, errStatusCode(int(reply.Status.Code))
 	}
 
 	if len(reply.RequestId) == 0 {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/base64"
 	"flag"
 	"fmt"
 	"html"
@@ -114,9 +113,6 @@ func queryURL() error {
 		return err
 	}
 
-	// TODO(jrubin) check reply.Status?
-	// TODO(jrubin) assert(len(reply.RequestIDs) > 0)
-
 	if handler.config.Poll {
 		return pollForResults(reply)
 	}
@@ -125,13 +121,7 @@ func queryURL() error {
 		return waitForCallback(reply)
 	}
 
-	strID := make([]string, len(reply.RequestId))
-
-	for i, id := range reply.RequestId {
-		strID[i] = base64.StdEncoding.EncodeToString(id)
-	}
-
-	fmt.Printf("Request ID(s): %s\n", strings.Join(strID, ", "))
+	fmt.Printf("Request ID(s): %s\n", strings.Join(reply.RequestId, ", "))
 	return nil
 }
 
@@ -139,24 +129,19 @@ func pollForResults(reply *msg.QueryReply) error {
 	errCh := make(chan error)
 
 	// TODO(jrubin) only poll for the first reqid?
-	resultCh := zClient.Poll(reply.RequestId[0], []msg.DataSetType{
-		// TODO(jrubin) get datasets from cmdline
-		msg.DataSetType_CATEGORIZATION,
-		msg.DataSetType_ADFRAUD,
-	}, errCh)
+	resultCh := zClient.Poll(reply.RequestId[0], errCh)
 
 	for {
 		select {
 		case err := <-errCh:
-			fmt.Println(err) // TODO(jrubin)
+			fmt.Fprintf(os.Stderr, "%s\n", err) // TODO(jrubin)
 		case result, ok := <-resultCh:
 			if !ok {
 				fmt.Fprintf(os.Stderr, "timeout\n")
 				return nil
 			}
 
-			fmt.Println(result) // TODO(jrubin)
-			return nil
+			return handleResult(result)
 		}
 	}
 }

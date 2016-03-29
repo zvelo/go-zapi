@@ -37,6 +37,8 @@ func (c *Client) GetToken() error {
 	}.Encode()))
 
 	req.Header.Set("User-Agent", c.UserAgent)
+	// TODO(jrubin) is there a json or protobuf way to do this? Forcing a form
+	// is kind of wierd
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	c.debugRequestOut(req)
