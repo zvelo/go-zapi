@@ -31,7 +31,14 @@ type pbHandler struct {
 }
 
 func (r req) PrepareReq(data []byte) (*http.Request, error) {
-	req, err := http.NewRequest(r.Method, r.URL, bytes.NewBuffer(data))
+	var req *http.Request
+	var err error
+
+	if data == nil {
+		req, err = http.NewRequest(r.Method, r.URL, nil)
+	} else {
+		req, err = http.NewRequest(r.Method, r.URL, bytes.NewBuffer(data))
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -43,6 +50,10 @@ func (r req) PrepareReq(data []byte) (*http.Request, error) {
 }
 
 func (h jsonHandler) PrepareReq(query interface{}) (*http.Request, error) {
+	if query == nil {
+		return h.req.PrepareReq(nil)
+	}
+
 	data, err := json.Marshal(query)
 	if err != nil {
 		return nil, err
@@ -61,6 +72,10 @@ func (h jsonHandler) ParseResp(body io.Reader, reply interface{}) error {
 }
 
 func (h pbHandler) PrepareReq(query interface{}) (*http.Request, error) {
+	if query == nil {
+		return h.req.PrepareReq(nil)
+	}
+
 	msg, ok := query.(proto.Message)
 	if !ok {
 		panic("invalid query type passed to pbHandler.PrepareReq")

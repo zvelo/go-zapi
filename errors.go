@@ -15,6 +15,7 @@ var (
 	errMissingURL         = fmt.Errorf("at least one url is required")
 	errMissingDataSet     = fmt.Errorf("at least one dataset is required")
 	errNilRequest         = fmt.Errorf("request was nil")
+	errMissingStatusCode  = fmt.Errorf("missing status code in response")
 )
 
 type errStatusCode int

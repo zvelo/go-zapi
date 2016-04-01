@@ -8,6 +8,8 @@ import (
 	"zvelo.io/msg/go-msg"
 )
 
+const jsonMIMESuffix = "+json"
+
 func massageURLs(urls []string) ([]string, error) {
 	ret := make([]string, 0, len(urls))
 
@@ -45,8 +47,8 @@ func (c Client) queryHandler() (handler, error) {
 	}
 
 	if c.JSON {
-		r.ContentType += "+json"
-		r.Accept += "+json"
+		r.ContentType += jsonMIMESuffix
+		r.Accept += jsonMIMESuffix
 
 		return jsonHandler{req: r}, nil
 	}

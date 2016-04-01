@@ -1,7 +1,6 @@
 package zapi
 
 import (
-	"encoding/json"
 	"net/http"
 	"path"
 	"time"
@@ -9,7 +8,7 @@ import (
 	"zvelo.io/msg/go-msg"
 )
 
-func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
+func (c Client) resultHandler(reqID string) (handler, error) {
 	if len(c.Token) == 0 {
 		if err := c.GetToken(); err != nil {
 			return nil, err
@@ -21,14 +20,39 @@ func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", queryEndpoint.String(), nil)
+	r := req{
+		Accept: "application/vnd.zvelo.query-result",
+		URL:    queryEndpoint.String(),
+		Method: "GET",
+	}
+
+	if c.JSON {
+		r.Accept += jsonMIMESuffix
+		return jsonHandler{req: r}, nil
+	}
+
+	return pbHandler{req: r}, nil
+}
+
+func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
+	if len(c.Token) == 0 {
+		if err := c.GetToken(); err != nil {
+			return nil, err
+		}
+	}
+
+	h, err := c.resultHandler(reqID)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := h.PrepareReq(nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", c.UserAgent)
 	req.Header.Set("Authorization", "Bearer "+c.Token)
-	req.Header.Set("Accept", "application/vnd.zvelo.query-result+json")
 
 	c.debugRequestOut(req)
 
@@ -44,13 +68,20 @@ func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
 		return nil, errStatusCode(resp.StatusCode)
 	}
 
-	decoder := json.NewDecoder(resp.Body)
-	result := &msg.QueryResult{}
-	if err = decoder.Decode(result); err != nil {
-		return nil, errDecodeJSON(err.Error())
+	if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
+		return nil, errContentType(ct)
 	}
 
-	if result.Status == nil || int(result.Status.Code) != resp.StatusCode {
+	result := &msg.QueryResult{}
+	if err = h.ParseResp(resp.Body, result); err != nil {
+		return nil, err
+	}
+
+	if result.Status == nil {
+		return nil, errMissingStatusCode
+	}
+
+	if int(result.Status.Code) != resp.StatusCode {
 		return nil, errStatusCode(int(result.Status.Code))
 	}
 
