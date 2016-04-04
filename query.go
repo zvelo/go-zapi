@@ -1,8 +1,10 @@
 package zapi
 
 import (
+	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"zvelo.io/msg/go-msg"
@@ -56,6 +58,35 @@ func (c Client) queryHandler() (handler, error) {
 	return pbHandler{req: r}, nil
 }
 
+func checkStatus(resp *http.Response, s *msg.Status, expectedCodes []int) error {
+	foundExpectedCode := false
+	for _, code := range expectedCodes {
+		if resp.StatusCode == code {
+			foundExpectedCode = true
+		}
+	}
+
+	if !foundExpectedCode {
+		fmt.Fprintf(os.Stderr, "unexpected http status code: %d (%s) => %s\n", resp.StatusCode, http.StatusText(resp.StatusCode), resp.Status)
+		// return nil, errStatusCode(resp.StatusCode)
+		return nil // TODO(jrubin)
+	}
+
+	if s == nil {
+		fmt.Fprintf(os.Stderr, "missing status code in message\n")
+		// return nil, errStatusCode(int(s.Code))
+		return nil // TODO(jrubin)
+	}
+
+	if int(s.Code) != resp.StatusCode {
+		fmt.Fprintf(os.Stderr, "unexpected status code in message: %d (%s) => %s\n", s.Code, http.StatusText(int(s.Code)), s.Message)
+		// return nil, errStatusCode(int(s.Code))
+		return nil // TODO(jrubin)
+	}
+
+	return nil
+}
+
 func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 	if query == nil {
 		return nil, errNilRequest
@@ -104,10 +135,6 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 
 	c.debugResponse(resp)
 
-	if resp.StatusCode != http.StatusCreated {
-		return nil, errStatusCode(resp.StatusCode)
-	}
-
 	if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
 		return nil, errContentType(ct)
 	}
@@ -117,8 +144,8 @@ func (c Client) Query(query *msg.QueryURLRequests) (*msg.QueryReply, error) {
 		return nil, err
 	}
 
-	if reply.Status == nil || int(reply.Status.Code) != resp.StatusCode {
-		return nil, errStatusCode(int(reply.Status.Code))
+	if err := checkStatus(resp, reply.Status, []int{http.StatusCreated}); err != nil {
+		return nil, err
 	}
 
 	if len(reply.RequestId) == 0 {

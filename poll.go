@@ -64,10 +64,6 @@ func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
 
 	c.debugResponse(resp)
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusAccepted {
-		return nil, errStatusCode(resp.StatusCode)
-	}
-
 	if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
 		return nil, errContentType(ct)
 	}
@@ -77,12 +73,8 @@ func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
 		return nil, err
 	}
 
-	if result.Status == nil {
-		return nil, errMissingStatusCode
-	}
-
-	if int(result.Status.Code) != resp.StatusCode {
-		return nil, errStatusCode(int(result.Status.Code))
+	if err := checkStatus(resp, result.Status, []int{http.StatusOK, http.StatusAccepted}); err != nil {
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
