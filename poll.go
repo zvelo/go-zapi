@@ -8,6 +8,8 @@ import (
 	"zvelo.io/msg/go-msg"
 )
 
+const queryResultType = "application/vnd.zvelo.query-result"
+
 func (c Client) resultHandler(reqID string) (handler, error) {
 	if len(c.Token) == 0 {
 		if err := c.GetToken(); err != nil {
@@ -21,7 +23,7 @@ func (c Client) resultHandler(reqID string) (handler, error) {
 	}
 
 	r := req{
-		Accept: "application/vnd.zvelo.query-result",
+		Accept: queryResultType,
 		URL:    queryEndpoint.String(),
 		Method: "GET",
 	}

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"zvelo.io/msg/go-msg"
@@ -59,29 +60,41 @@ func (c Client) queryHandler() (handler, error) {
 }
 
 func checkStatus(resp *http.Response, s *msg.Status, expectedCodes []int) error {
-	foundExpectedCode := false
-	for _, code := range expectedCodes {
-		if resp.StatusCode == code {
-			foundExpectedCode = true
-		}
-	}
-
-	if !foundExpectedCode {
-		fmt.Fprintf(os.Stderr, "unexpected http status code: %d (%s) => %s\n", resp.StatusCode, http.StatusText(resp.StatusCode), resp.Status)
-		// return nil, errStatusCode(resp.StatusCode)
-		return nil // TODO(jrubin)
-	}
-
 	if s == nil {
 		fmt.Fprintf(os.Stderr, "missing status code in message\n")
 		// return nil, errStatusCode(int(s.Code))
 		return nil // TODO(jrubin)
 	}
 
-	if int(s.Code) != resp.StatusCode {
-		fmt.Fprintf(os.Stderr, "unexpected status code in message: %d (%s) => %s\n", s.Code, http.StatusText(int(s.Code)), s.Message)
+	foundExpectedCode := false
+	for _, code := range expectedCodes {
+		if int(s.Code) == code {
+			foundExpectedCode = true
+		}
+	}
+
+	if !foundExpectedCode {
+		expected := make([]string, len(expectedCodes))
+		for i, code := range expectedCodes {
+			expected[i] = strconv.Itoa(code)
+		}
+
+		fmt.Fprintf(os.Stderr, "unexpected status code in message: %d (%s) => %s [expected: %s]\n", s.Code, http.StatusText(int(s.Code)), s.Message, strings.Join(expected, ", "))
 		// return nil, errStatusCode(int(s.Code))
 		return nil // TODO(jrubin)
+	}
+
+	if resp != nil {
+		if int(s.Code) != resp.StatusCode {
+			expected := make([]string, len(expectedCodes))
+			for i, code := range expectedCodes {
+				expected[i] = strconv.Itoa(code)
+			}
+
+			fmt.Fprintf(os.Stderr, "unexpected http status code: %d (%s) => %s [expected: %s]\n", resp.StatusCode, http.StatusText(resp.StatusCode), resp.Status, strings.Join(expected, ", "))
+			// return nil, errStatusCode(resp.StatusCode)
+			return nil // TODO(jrubin)
+		}
 	}
 
 	return nil

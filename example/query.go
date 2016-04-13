@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"html"
 	"net/http"
 	"os"
 	"strings"
@@ -31,7 +30,8 @@ type callbackHandler struct {
 		PartialResults             bool
 		Poll                       bool
 	}
-	doneCh chan *http.Request // TODO(jrubin)
+	doneCh chan *msg.QueryResult
+	errCh  chan error
 }
 
 func init() {
@@ -100,7 +100,8 @@ func setupQuery() error {
 	}
 
 	if len(handler.config.CallbackURL) > 0 {
-		handler.doneCh = make(chan *http.Request, 1) // TODO(jrubin)
+		handler.errCh = make(chan error, 1)
+		handler.doneCh = make(chan *msg.QueryResult, 1)
 		go func() { _ = http.ListenAndServe(handler.config.ListenAddress, handler) }()
 	}
 
@@ -166,35 +167,40 @@ func pollForResults(reply *msg.QueryReply) error {
 	for {
 		select {
 		case err := <-errCh:
-			fmt.Fprintf(os.Stderr, "%s\n", err) // TODO(jrubin)
+			fmt.Fprintf(os.Stderr, "%s\n", err)
 		case result, ok := <-resultCh:
 			if !ok {
 				fmt.Fprintf(os.Stderr, "timeout\n")
 				return nil
 			}
 
-			return handleResult(result)
+			return result.Pretty(os.Stdout)
 		}
 	}
 }
 
 func waitForCallback(reply *msg.QueryReply) error {
-	// TODO(jrubin)
-	select {
-	case req := <-handler.doneCh:
-		// TODO(jrubin)
-		zClient.DebugRequest(req)
-		return nil
-	case <-time.After(handler.config.Timeout):
-		// TODO(jrubin)
-		fmt.Fprintf(os.Stderr, "timeout")
-		return nil
+	for {
+		select {
+		case err := <-handler.errCh:
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+		case result := <-handler.doneCh:
+			return result.Pretty(os.Stdout)
+		case <-time.After(handler.config.Timeout):
+			fmt.Fprintf(os.Stderr, "timeout")
+			return nil
+		}
 	}
 }
 
 func (h callbackHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// TODO(jrubin)
-	fmt.Fprintf(w, "Hello, %q", html.EscapeString(r.URL.Path))
-	// TODO(jrubin) when are we really done?
-	h.doneCh <- r
+	fmt.Fprintf(w, "OK")
+
+	result, err := zClient.ProcessCallback(r)
+	if err != nil {
+		h.errCh <- err
+		return
+	}
+
+	h.doneCh <- result
 }

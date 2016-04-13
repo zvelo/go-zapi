@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-
-	"zvelo.io/msg/go-msg"
 )
 
 var requestID string
@@ -42,7 +40,7 @@ func pollURL() error {
 			return err
 		}
 
-		return handleResult(result)
+		return result.Pretty(os.Stdout)
 	}
 
 	errCh := make(chan error)
@@ -51,19 +49,14 @@ func pollURL() error {
 	for {
 		select {
 		case err := <-errCh:
-			fmt.Fprintf(os.Stderr, "%s\n", err) // TODO(jrubin)
+			fmt.Fprintf(os.Stderr, "%s\n", err)
 		case result, ok := <-resultCh:
 			if !ok {
 				fmt.Fprintf(os.Stderr, "timeout\n")
 				return nil
 			}
 
-			return handleResult(result)
+			return result.Pretty(os.Stdout)
 		}
 	}
-}
-
-func handleResult(result *msg.QueryResult) error {
-	fmt.Println(result) // TODO(jrubin)
-	return nil
 }
