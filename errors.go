@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"zvelo.io/msg/go-msg"
+	"zvelo.io/msg"
 )
 
 var (

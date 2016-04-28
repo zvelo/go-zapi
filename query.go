@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"zvelo.io/msg/go-msg"
+	"zvelo.io/msg"
 )
 
 const jsonMIMESuffix = "+json"

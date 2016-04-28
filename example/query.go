@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"zvelo.io/msg/go-msg"
+	"zvelo.io/msg"
 )
 
 const (

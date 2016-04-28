@@ -5,7 +5,7 @@ import (
 	"path"
 	"time"
 
-	"zvelo.io/msg/go-msg"
+	"zvelo.io/msg"
 )
 
 const queryResultType = "application/vnd.zvelo.query-result"

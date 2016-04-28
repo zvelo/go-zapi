@@ -3,7 +3,7 @@ package zapi
 import (
 	"net/http"
 
-	"zvelo.io/msg/go-msg"
+	"zvelo.io/msg"
 )
 
 func (c Client) ProcessCallback(req *http.Request) (*msg.QueryResult, error) {
