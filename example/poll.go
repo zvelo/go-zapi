@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
+
+	"zvelo.io/msg"
 )
 
 var requestID string
@@ -44,7 +46,9 @@ func pollURL() error {
 	}
 
 	errCh := make(chan error)
-	resultCh := zClient.Poll(requestID, errCh)
+	resultCh := make(chan *msg.QueryResult)
+
+	zClient.Poll(requestID, resultCh, errCh)
 
 	for {
 		select {

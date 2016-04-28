@@ -87,9 +87,7 @@ func (c Client) PollOnce(reqID string) (*msg.QueryResult, error) {
 	return result, nil
 }
 
-func (c Client) Poll(reqID string, errCh chan<- error) <-chan *msg.QueryResult {
-	ch := make(chan *msg.QueryResult, 1)
-
+func (c Client) Poll(reqID string, ch chan<- *msg.QueryResult, errCh chan<- error) {
 	poll := func() bool {
 		result, err := c.PollOnce(reqID)
 		if err != nil {
@@ -123,6 +121,4 @@ func (c Client) Poll(reqID string, errCh chan<- error) <-chan *msg.QueryResult {
 			}
 		}
 	}()
-
-	return ch
 }

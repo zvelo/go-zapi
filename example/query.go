@@ -151,7 +151,8 @@ func queryURL() error {
 	}
 
 	if len(handler.config.CallbackURL) > 0 {
-		return waitForCallback(reply)
+		waitForCallback(reply)
+		return nil
 	}
 
 	fmt.Printf("Request ID(s): %s\n", strings.Join(reply.RequestId, ", "))
@@ -160,15 +161,19 @@ func queryURL() error {
 
 func pollForResults(reply *msg.QueryReply) error {
 	errCh := make(chan error)
+	resultCh := make(chan *msg.QueryResult)
 
-	// TODO(jrubin) only poll for the first reqid?
-	resultCh := zClient.Poll(reply.RequestId[0], errCh)
+	for _, reqID := range reply.RequestId {
+		zClient.Poll(reqID, resultCh, errCh)
+	}
 
-	for {
+	for i := 0; i < len(reply.RequestId); {
 		select {
 		case err := <-errCh:
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 		case result, ok := <-resultCh:
+			i++
+
 			if !ok {
 				fmt.Fprintf(os.Stderr, "timeout\n")
 				return nil
@@ -177,18 +182,23 @@ func pollForResults(reply *msg.QueryReply) error {
 			return result.Pretty(os.Stdout)
 		}
 	}
+
+	return nil
 }
 
-func waitForCallback(reply *msg.QueryReply) error {
-	for {
+func waitForCallback(reply *msg.QueryReply) {
+	for i := 0; i < len(reply.RequestId); {
 		select {
 		case err := <-handler.errCh:
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 		case result := <-handler.doneCh:
-			return result.Pretty(os.Stdout)
+			i++
+			if err := result.Pretty(os.Stdout); err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
 		case <-time.After(handler.config.Timeout):
+			i++
 			fmt.Fprintf(os.Stderr, "timeout")
-			return nil
 		}
 	}
 }
