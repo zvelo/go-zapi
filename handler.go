@@ -11,7 +11,7 @@ import (
 )
 
 type handler interface {
-	PrepareReq(query interface{}) (*http.Request, error)
+	PrepareReq(req interface{}) (*http.Request, error)
 	ParseResp(body io.Reader, reply interface{}) error
 }
 
@@ -49,12 +49,12 @@ func (r req) PrepareReq(data []byte) (*http.Request, error) {
 	return req, nil
 }
 
-func (h jsonHandler) PrepareReq(query interface{}) (*http.Request, error) {
-	if query == nil {
+func (h jsonHandler) PrepareReq(req interface{}) (*http.Request, error) {
+	if req == nil {
 		return h.req.PrepareReq(nil)
 	}
 
-	data, err := json.Marshal(query)
+	data, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
@@ -71,14 +71,14 @@ func (h jsonHandler) ParseResp(body io.Reader, reply interface{}) error {
 	return nil
 }
 
-func (h pbHandler) PrepareReq(query interface{}) (*http.Request, error) {
-	if query == nil {
+func (h pbHandler) PrepareReq(req interface{}) (*http.Request, error) {
+	if req == nil {
 		return h.req.PrepareReq(nil)
 	}
 
-	msg, ok := query.(proto.Message)
+	msg, ok := req.(proto.Message)
 	if !ok {
-		panic("invalid query type passed to pbHandler.PrepareReq")
+		panic("invalid request type passed to pbHandler.PrepareReq")
 	}
 
 	data, err := proto.Marshal(msg)

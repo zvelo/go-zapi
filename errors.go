@@ -16,6 +16,7 @@ var (
 	errMissingDataSet     = fmt.Errorf("at least one dataset is required")
 	errNilRequest         = fmt.Errorf("request was nil")
 	errMissingStatusCode  = fmt.Errorf("missing status code in response")
+	errMissingEndpoint    = fmt.Errorf("endpoint is required")
 )
 
 type errStatusCode int

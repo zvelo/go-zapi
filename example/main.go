@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"zvelo.io/go-zapi"
+	"zvelo.io/msg"
 )
 
 type subcommand struct {
@@ -22,8 +24,10 @@ const (
 )
 
 var (
-	cmd     = map[string]subcommand{}
-	zClient = zapi.New()
+	cmd      = map[string]subcommand{}
+	zClient  = zapi.New()
+	dataset  string
+	datasets = []msg.DataSetType{}
 )
 
 func init() {
@@ -90,6 +94,24 @@ func init() {
 		"json",
 		getDefaultBool("ZVELO_JSON"),
 		"Use json instead of protocol buffers for api requests [$ZVELO_JSON]",
+	)
+
+	allDatasets := make([]string, len(msg.DataSetType_name)-1)
+	i := 0
+	for dst, name := range msg.DataSetType_name {
+		if dst == int32(msg.DataSetType_ECHO) {
+			continue
+		}
+
+		allDatasets[i] = name
+		i++
+	}
+
+	flag.StringVar(
+		&dataset,
+		"dataset",
+		getDefaultString("ZVELO_DATASET", "CATEGORIZATION"),
+		"comma separated list of datasets to retrieve (available options: "+strings.Join(allDatasets, ", ")+") [$ZVELO_DATASET]",
 	)
 }
 
@@ -190,6 +212,20 @@ func setupGlobal() error {
 	if len(zClient.Token) == 0 &&
 		(len(zClient.Username) == 0 || len(zClient.Password) == 0) {
 		return fmt.Errorf("-token or -username and -password are required")
+	}
+
+	for _, dsName := range strings.Split(dataset, ",") {
+		dsName = strings.TrimSpace(dsName)
+		dst, err := msg.NewDataSetType(dsName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid dataset type: %s\n", dsName)
+			continue
+		}
+		datasets = append(datasets, dst)
+	}
+
+	if len(datasets) == 0 {
+		return fmt.Errorf("at least one valid dataset is required")
 	}
 
 	return nil

@@ -20,6 +20,7 @@ const (
 	DefaultPollTimeout  = 15 * time.Minute
 	tokenPath           = "auth/token"
 	urlPath             = "queries/url"
+	streamsPath         = "streams"
 )
 
 type Doer interface {
