@@ -2,8 +2,7 @@ package main
 
 import (
 	"flag"
-
-	"github.com/kr/pretty"
+	"fmt"
 )
 
 func init() {
@@ -24,7 +23,8 @@ func streamList() error {
 	}
 
 	// TODO(jrubin)
-	pretty.Println(reply)
+	// pretty.Println(reply)
+	fmt.Println(reply)
 
 	return nil
 }

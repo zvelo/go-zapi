@@ -4,8 +4,6 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/kr/pretty"
-
 	"zvelo.io/msg"
 )
 
@@ -74,7 +72,8 @@ func streamCreate() error {
 	}
 
 	// TODO(jrubin)
-	pretty.Println(reply)
+	// pretty.Println(reply)
+	fmt.Println(reply)
 
 	return nil
 }
