@@ -171,33 +171,31 @@ func (c Client) StreamUpdate(uuid string, stream *msg.StreamRequest) (*msg.Strea
 	return nil, nil
 }
 
-func (c Client) StreamDelete(uuids ...string) (*msg.StreamReply, error) {
-	for _, uuid := range uuids {
-		h, err := c.streamsHandler("DELETE", uuid)
-		if err != nil {
-			return nil, err
-		}
-
-		req, err := h.PrepareReq(nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("User-Agent", c.UserAgent)
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-
-		c.debugRequestOut(req)
-
-		resp, err := c.HTTPClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer func() { _ = resp.Body.Close() }()
-
-		c.debugResponse(resp)
-
-		// TODO(jrubin)
+func (c Client) StreamDelete(uuid string) (*msg.StreamReply, error) {
+	h, err := c.streamsHandler("DELETE", uuid)
+	if err != nil {
+		return nil, err
 	}
+
+	req, err := h.PrepareReq(nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", c.UserAgent)
+	req.Header.Set("Authorization", "Bearer "+c.Token)
+
+	c.debugRequestOut(req)
+
+	resp, err := c.HTTPClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	c.debugResponse(resp)
+
+	// TODO(jrubin)
 
 	return nil, nil
 }
