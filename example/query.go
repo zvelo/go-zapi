@@ -1,29 +1,30 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/urfave/cli"
 	"zvelo.io/msg"
 )
 
 const (
-	callbackDefaultListenAddress = "[::1]:8080"
-	callbackDefaultTimeout       = 15 * time.Minute
+	callbackDefaultTimeout = 15 * time.Minute
 )
 
+type config struct {
+	URLs                       []string
+	ListenAddress, CallbackURL string
+	Timeout                    time.Duration
+	PartialResults             bool
+	Poll                       bool
+}
+
 type callbackHandler struct {
-	config struct {
-		URLs                       []string
-		ListenAddress, CallbackURL string
-		Timeout                    time.Duration
-		PartialResults             bool
-		Poll                       bool
-	}
+	cfg    config
 	doneCh chan *msg.QueryResult
 	errCh  chan error
 }
@@ -31,76 +32,93 @@ type callbackHandler struct {
 var cbHandler callbackHandler
 
 func init() {
-	fs := flag.NewFlagSet("query", flag.ExitOnError)
-	fs.Usage = cmdUsage(fs, "url [url...]")
-
-	fs.BoolVar(&cbHandler.config.Poll, "poll", getDefaultBool("ZVELO_QUERY_POLL"), "poll for results [$ZVELO_QUERY_POLL]")
-
-	fs.StringVar(
-		&cbHandler.config.ListenAddress,
-		"listen-address",
-		getDefaultString("ZVELO_QUERY_LISTEN_ADDRESS", callbackDefaultListenAddress),
-		"address and port to listen for callbacks on [$ZVELO_QUERY_LISTEN_ADDRESS]",
-	)
-
-	fs.StringVar(
-		&cbHandler.config.CallbackURL,
-		"callback-url",
-		getDefaultString("ZVELO_QUERY_CALLBACK_URL", ""),
-		"publicly accessible base URL that routes to the address used by the -listen-address flag [$ZVELO_QUERY_CALLBACK_URL]",
-	)
-
-	fs.DurationVar(
-		&cbHandler.config.Timeout,
-		"timeout",
-		callbackDefaultTimeout, // TODO(jrubin) use getDefaultDuration and $ZVELO_QUERY_TIMEOUT
-		"maximum amount of time to wait for the callback to be called",
-	)
-
-	fs.BoolVar(
-		&cbHandler.config.PartialResults,
-		"partial-results",
-		false, // TODO(jrubin) use getDefaultBool and $ZVELO_QUERY_PARTIAL_RESULTS
-		"request that datasets be delivered as soon as they become available instead of waiting for all datasets to become available before responding",
-	)
-
-	cmd["query"] = subcommand{
-		FlagSet: fs,
-		Setup:   setupQuery,
-		Action:  queryURL,
-		Usage:   "query for url",
-	}
+	app.Commands = append(app.Commands, cli.Command{
+		Name:   "query",
+		Usage:  "query for a URL",
+		Action: queryURL,
+		Before: setupQuery,
+		Flags: []cli.Flag{
+			cli.StringSliceFlag{
+				Name:  "url, u",
+				Usage: "list of URLs to query for",
+			},
+			cli.StringFlag{
+				Name:   "listen, l",
+				EnvVar: "ZVELO_QUERY_LISTEN_ADDRESS",
+				Usage:  "address and port to listen for callbacks",
+				Value:  "[::1]:8080",
+			},
+			cli.StringFlag{
+				Name:   "callback, cb",
+				EnvVar: "ZVELO_QUERY_CALLBACK_URL",
+				Usage:  "publicly accessible base URL that routes to the address used by -listen flag",
+			},
+			cli.DurationFlag{
+				Name:   "timeout, qt",
+				EnvVar: "ZVELO_QUERY_TIMEOUT",
+				Usage:  "maximum amount of time to wait for the callback to be called",
+				Value:  callbackDefaultTimeout,
+			},
+			cli.BoolFlag{
+				Name:   "partial-results, pr",
+				EnvVar: "ZVELO_QUERY_PARTIAL_RESULTS",
+				Usage:  "request that datasets be delivered as soon as they become available instead of waiting for all datasets to become available before responding",
+			},
+			cli.BoolFlag{
+				Name:   "poll, qp",
+				EnvVar: "ZVELO_QUERY_POLL",
+				Usage:  "poll for resutls",
+			},
+		},
+	})
 }
 
-func setupQuery() error {
-	if cbHandler.config.Poll && len(cbHandler.config.CallbackURL) > 0 {
+func setupQuery(c *cli.Context) error {
+	if err := setupClient(c); err != nil {
+		return err
+	}
+
+	if err := setupDS(c); err != nil {
+		return err
+	}
+
+	cbHandler.cfg = config{
+		URLs:           c.StringSlice("url"),
+		ListenAddress:  c.String("listen"),
+		CallbackURL:    c.String("callback"),
+		Timeout:        c.Duration("timeout"),
+		PartialResults: c.Bool("partial-results"),
+		Poll:           c.Bool("poll"),
+	}
+
+	if cbHandler.cfg.Poll && len(cbHandler.cfg.CallbackURL) > 0 {
 		return fmt.Errorf("poll and callback can't both be true")
 	}
 
-	if len(cbHandler.config.CallbackURL) > 0 {
+	if len(cbHandler.cfg.CallbackURL) > 0 {
 		cbHandler.errCh = make(chan error, 1)
 		cbHandler.doneCh = make(chan *msg.QueryResult, 1)
-		go func() { _ = http.ListenAndServe(cbHandler.config.ListenAddress, cbHandler) }()
+		go func() { _ = http.ListenAndServe(cbHandler.cfg.ListenAddress, cbHandler) }()
 	}
 
-	cbHandler.config.URLs = cmd["query"].FlagSet.Args()
+	cbHandler.cfg.URLs = c.StringSlice("url")
 
-	if len(cbHandler.config.URLs) == 0 {
+	if len(cbHandler.cfg.URLs) == 0 {
 		return fmt.Errorf("at least one url is required")
 	}
 
 	return nil
 }
 
-func queryURL() error {
+func queryURL(c *cli.Context) error {
 	req := &msg.QueryURLRequests{
-		Url:     cbHandler.config.URLs,
+		Url:     cbHandler.cfg.URLs,
 		Dataset: datasets,
 	}
 
-	if len(cbHandler.config.CallbackURL) > 0 {
-		req.Callback = cbHandler.config.CallbackURL
-		req.PartialResults = cbHandler.config.PartialResults
+	if len(cbHandler.cfg.CallbackURL) > 0 {
+		req.Callback = cbHandler.cfg.CallbackURL
+		req.PartialResults = cbHandler.cfg.PartialResults
 		// TODO(jrubin) add support for Accept field in msg.QueryURLRequests
 	} else {
 		req.Poll = true
@@ -111,11 +129,11 @@ func queryURL() error {
 		return err
 	}
 
-	if cbHandler.config.Poll {
+	if cbHandler.cfg.Poll {
 		return pollForResults(reply)
 	}
 
-	if len(cbHandler.config.CallbackURL) > 0 {
+	if len(cbHandler.cfg.CallbackURL) > 0 {
 		waitForCallback(reply)
 		return nil
 	}
@@ -161,7 +179,7 @@ func waitForCallback(reply *msg.QueryReply) {
 			if err := result.Pretty(os.Stdout); err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 			}
-		case <-time.After(cbHandler.config.Timeout):
+		case <-time.After(cbHandler.cfg.Timeout):
 			i++
 			fmt.Fprintf(os.Stderr, "timeout")
 		}
