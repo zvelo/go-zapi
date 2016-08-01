@@ -1,10 +1,10 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
+	"github.com/urfave/cli"
 	"zvelo.io/msg"
 )
 
@@ -12,21 +12,31 @@ var requestID string
 var pollOnce bool
 
 func init() {
-	fs := flag.NewFlagSet("poll", flag.ExitOnError)
-	fs.Usage = cmdUsage(fs, "request_id")
-
-	fs.BoolVar(&pollOnce, "once", getDefaultBool("POLL_ONCE"), "make just a single poll request [$ZVELO_POLL_ONCE]")
-
-	cmd["poll"] = subcommand{
-		FlagSet: fs,
-		Setup:   setupPoll,
-		Action:  pollURL,
-		Usage:   "poll for results with a request_id",
-	}
+	app.Commands = append(app.Commands, cli.Command{
+		Name:   "poll",
+		Usage:  "poll for results with a request-id",
+		Action: pollURL,
+		Before: setupPoll,
+		Flags: []cli.Flag{
+			cli.BoolFlag{
+				Name:   "once, o",
+				EnvVar: "ZVELO_POLL_ONCE",
+				Usage:  "make just a single poll request",
+			},
+			cli.StringFlag{
+				Name:  "request-id, rid",
+				Usage: "request id to poll for",
+			},
+		},
+	})
 }
 
-func setupPoll() error {
-	requestID = cmd["poll"].FlagSet.Arg(0)
+func setupPoll(c *cli.Context) error {
+	if err := setupClient(c); err != nil {
+		return err
+	}
+	requestID = c.String("request-id")
+	pollOnce = c.Bool("once")
 
 	if len(requestID) == 0 {
 		return fmt.Errorf("request_id is required")
@@ -35,7 +45,7 @@ func setupPoll() error {
 	return nil
 }
 
-func pollURL() error {
+func pollURL(c *cli.Context) error {
 	if pollOnce {
 		result, err := zClient.PollOnce(requestID)
 		if err != nil {
