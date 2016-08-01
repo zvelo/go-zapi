@@ -1,21 +1,29 @@
 package main
 
 import (
-	"flag"
 	"fmt"
+
+	"github.com/urfave/cli"
 )
 
 func init() {
-	fs := flag.NewFlagSet("get-token", flag.ExitOnError)
-
-	cmd["get-token"] = subcommand{
-		FlagSet: fs,
-		Action:  getToken,
-		Usage:   "get token using username and password",
-	}
+	app.Commands = append(app.Commands, cli.Command{
+		Name:   "get-token",
+		Usage:  "get token using username and password",
+		Action: getToken,
+		Before: setupGetToken,
+	})
 }
 
-func getToken() error {
+func setupGetToken(c *cli.Context) error {
+	if err := setupClient(c); err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+func getToken(c *cli.Context) error {
 	if err := zClient.GetToken(); err != nil {
 		return err
 	}
