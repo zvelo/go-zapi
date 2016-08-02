@@ -35,6 +35,7 @@ func setupPoll(c *cli.Context) error {
 	if err := setupClient(c); err != nil {
 		return err
 	}
+
 	requestID = c.String("request-id")
 	pollOnce = c.Bool("once")
 
