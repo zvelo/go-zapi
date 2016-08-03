@@ -1,22 +1,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
+	"github.com/urfave/cli"
 	"zvelo.io/go-zapi"
 	"zvelo.io/msg"
 )
-
-type subcommand struct {
-	FlagSet *flag.FlagSet
-	Setup   func() error
-	Action  func() error
-	Usage   string
-}
 
 const (
 	name    = "zvelo-api-example-go"
@@ -24,199 +16,102 @@ const (
 )
 
 var (
-	cmd      = map[string]subcommand{}
 	zClient  = zapi.New()
-	dataset  string
 	datasets = []msg.DataSetType{}
+	app      = initApp()
 )
 
-func init() {
-	// global flags
-
-	flag.StringVar(
-		&zClient.UserAgent,
-		"user-agent",
-		getDefaultString("ZVELO_USER_AGENT", name+" "+version),
-		"user-agent to use when making requests to zvelo-api [$ZVELO_USER_AGENT]",
-	)
-
-	flag.StringVar(
-		&zClient.Endpoint,
-		"endpoint",
-		getDefaultString("ZVELO_ENDPOINT", zapi.DefaultEndpoint),
-		"URL of the API endpoint [$ZVELO_ENDPOINT]",
-	)
-
-	flag.BoolVar(
-		&zClient.Debug,
-		"debug",
-		getDefaultBool("ZVELO_DEBUG"),
-		"enable debug logging [$ZVELO_DEBUG]",
-	)
-
-	flag.StringVar(
-		&zClient.Token,
-		"token",
-		getDefaultString("ZVELO_TOKEN", ""),
-		"Token for making the query [$ZVELO_TOKEN]",
-	)
-
-	flag.StringVar(
-		&zClient.Username,
-		"username",
-		getDefaultString("ZVELO_USERNAME", ""),
-		"Username to obtain a token as [$ZVELO_USERNAME]",
-	)
-
-	flag.StringVar(
-		&zClient.Password,
-		"password",
-		getDefaultString("ZVELO_PASSWORD", ""),
-		"Password to obtain a token with [$ZVELO_PASSWORD]",
-	)
-
-	flag.DurationVar(
-		&zClient.PollTimeout,
-		"timeout",
-		zapi.DefaultPollTimeout,
-		"timeout after this much time has elapsed",
-	)
-
-	flag.DurationVar(
-		&zClient.PollInterval,
-		"interval",
-		zapi.DefaultPollInterval,
-		"amount of time between polling requests",
-	)
-
-	flag.BoolVar(
-		&zClient.JSON,
-		"json",
-		getDefaultBool("ZVELO_JSON"),
-		"Use json instead of protocol buffers for api requests [$ZVELO_JSON]",
-	)
-
-	allDatasets := make([]string, len(msg.DataSetType_name)-1)
-	i := 0
-	for dst, name := range msg.DataSetType_name {
-		if dst == int32(msg.DataSetType_ECHO) {
-			continue
-		}
-
-		allDatasets[i] = name
-		i++
+func initApp() *cli.App {
+	nApp := cli.NewApp()
+	nApp.Name = name
+	nApp.Version = version
+	nApp.Usage = "example client for zvelo api"
+	nApp.Authors = []cli.Author{
+		{Name: "Joshua Rubin", Email: "jrubin@zvelo.com"},
+		{Name: "RJ Nanjegowda", Email: "rnanjegowda@zvelo.com"},
 	}
 
-	flag.StringVar(
-		&dataset,
-		"dataset",
-		getDefaultString("ZVELO_DATASET", "CATEGORIZATION"),
-		"comma separated list of datasets to retrieve (available options: "+strings.Join(allDatasets, ", ")+") [$ZVELO_DATASET]",
-	)
+	// Global flags
+	nApp.Flags = []cli.Flag{
+		cli.StringFlag{
+			Name:   "user-agent, ua",
+			EnvVar: "ZVELO_USER_AGENT",
+			Usage:  "user-agent to use when making requests to zvelo-api",
+			Value:  name + " " + version,
+		},
+		cli.StringFlag{
+			Name:   "endpoint, ep",
+			EnvVar: "ZVELO_ENDPOINT",
+			Usage:  "URL of the API endpoint",
+			Value:  zapi.DefaultEndpoint,
+		},
+		cli.BoolFlag{
+			Name:   "debug, d",
+			EnvVar: "ZVELO_DEBUG",
+			Usage:  "enable debug logging",
+		},
+		cli.StringFlag{
+			Name:   "token, tk",
+			EnvVar: "ZVELO_TOKEN",
+			Usage:  "Token for making the query",
+		},
+		cli.StringFlag{
+			Name:   "username, u",
+			EnvVar: "ZVELO_USERNAME",
+			Usage:  "Username to obtain a token",
+		},
+		cli.StringFlag{
+			Name:   "password, p",
+			EnvVar: "ZVELO_PASSWORD",
+			Usage:  "Password to obtain a token",
+		},
+		cli.DurationFlag{
+			Name:  "timeout, to",
+			Usage: "timeout after this much time has elapsed",
+			Value: zapi.DefaultPollTimeout,
+		},
+		cli.DurationFlag{
+			Name:  "interval, in",
+			Usage: "amount of time between polling requests",
+			Value: zapi.DefaultPollInterval,
+		},
+		cli.BoolFlag{
+			Name:   "json, j",
+			EnvVar: "ZVELO_JSON",
+			Usage:  "Use json instead of protocol buffers for api requests",
+		},
+		cli.StringSliceFlag{
+			Name:   "dataset, ds",
+			EnvVar: "ZVELO_DATASET",
+			Usage:  "list of datasets to retrieve (available options: " + strings.Join(availableDS(), ", ") + ")",
+		},
+	}
+	return nApp
 }
 
 func main() {
-	// parse flags and run necessary setup
-	fn, err := parseFlags()
-	if err != nil {
+	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
-		os.Exit(1)
-	}
-
-	// execute the command
-	if fn != nil {
-		if err := fn(); err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err)
-			os.Exit(1)
-		}
 	}
 }
 
-func printCmdUsage() {
-	for name, sc := range cmd {
-		fmt.Fprintf(os.Stderr, "  %s\n        %s\n", name, sc.Usage)
-	}
-}
+func setupClient(c *cli.Context) error {
+	zClient.Endpoint, zClient.UserAgent, zClient.Debug = c.GlobalString("endpoint"), c.GlobalString("useragent"), c.GlobalBool("debug")
+	zClient.Token, zClient.Username, zClient.Password = c.GlobalString("token"), c.GlobalString("username"), c.GlobalString("password")
+	zClient.PollTimeout, zClient.PollInterval = c.GlobalDuration("timeout"), c.GlobalDuration("interval")
+	zClient.JSON = c.GlobalBool("json")
 
-func getDefaultString(envVar, fallback string) string {
-	ret := os.Getenv(envVar)
-	if len(ret) == 0 {
-		return fallback
-	}
-	return ret
-}
-
-func getDefaultBool(envVar string) bool {
-	val := os.Getenv(envVar)
-	if len(val) == 0 {
-		return false
-	}
-
-	ret, err := strconv.ParseBool(val)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing bool: %s\n", err)
-		return false
-	}
-
-	return ret
-}
-
-func parseFlags() (func() error, error) {
-	// parse global flags
-	flag.Parse()
-
-	// run global setup
-	if err := setupGlobal(); err != nil {
-		flag.Usage()
-		printCmdUsage()
-		return nil, err
-	}
-
-	// ensure command exists
-	if len(flag.Args()) == 0 {
-		flag.Usage()
-		printCmdUsage()
-		return nil, fmt.Errorf("command is required")
-	}
-
-	// ensure command is valid
-	sc, ok := cmd[flag.Args()[0]]
-	if !ok {
-		printCmdUsage()
-		return nil, fmt.Errorf("invalid command")
-	}
-
-	// parse command flags
-	if sc.FlagSet != nil {
-		_ = sc.FlagSet.Parse(flag.Args()[1:])
-	}
-
-	// run command setup
-	if sc.Setup != nil {
-		if err := sc.Setup(); err != nil {
-			if sc.FlagSet != nil {
-				if sc.FlagSet.Usage != nil {
-					sc.FlagSet.Usage()
-				} else {
-					sc.FlagSet.PrintDefaults()
-				}
-			}
-			return nil, err
-		}
-	}
-
-	return sc.Action, nil
-}
-
-func setupGlobal() error {
 	if len(zClient.Token) == 0 &&
 		(len(zClient.Username) == 0 || len(zClient.Password) == 0) {
 		return fmt.Errorf("-token or -username and -password are required")
 	}
 
-	for _, dsName := range strings.Split(dataset, ",") {
-		dsName = strings.TrimSpace(dsName)
-		dst, err := msg.NewDataSetType(dsName)
+	return nil
+}
+
+func setupDS(c *cli.Context) error {
+	for _, dsName := range c.GlobalStringSlice("dataset") {
+		dst, err := msg.NewDataSetType(strings.TrimSpace(dsName))
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid dataset type: %s\n", dsName)
 			continue
@@ -231,11 +126,16 @@ func setupGlobal() error {
 	return nil
 }
 
-func cmdUsage(fs *flag.FlagSet, usage string) func() {
-	exec := os.Args[0]
+func availableDS() []string {
+	allDatasets := make([]string, len(msg.DataSetType_name)-1)
+	i := 0
+	for dst, name := range msg.DataSetType_name {
+		if dst == int32(msg.DataSetType_ECHO) {
+			continue
+		}
 
-	return func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s %s: %s\n", exec, flag.Args()[0], usage)
-		fs.PrintDefaults()
+		allDatasets[i] = name
+		i++
 	}
+	return allDatasets
 }

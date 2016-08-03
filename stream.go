@@ -1,6 +1,8 @@
 package zapi
 
 import (
+	"fmt"
+	"net/http"
 	"path"
 
 	"zvelo.io/msg"
@@ -8,6 +10,7 @@ import (
 
 func (c Client) streamsHandler(method string, uuid string) (handler, error) {
 	streamsEndpoint, err := c.endpointURL(path.Join(streamsPath, uuid))
+	fmt.Println(streamsEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -29,7 +32,7 @@ func (c Client) streamsHandler(method string, uuid string) (handler, error) {
 	return pbHandler{req: r}, nil
 }
 
-func (c Client) StreamsList() ([]*msg.StreamReply, error) {
+func (c Client) StreamsList() (*msg.StreamsReply, error) {
 	h, err := c.streamsHandler("GET", "")
 	if err != nil {
 		return nil, err
@@ -58,9 +61,16 @@ func (c Client) StreamsList() ([]*msg.StreamReply, error) {
 
 	c.debugResponse(resp)
 
-	// TODO(jrubin)
+	reply := &msg.StreamsReply{}
+	if err = h.ParseResp(resp.Body, reply); err != nil {
+		return nil, err
+	}
 
-	return nil, nil
+	if err := checkStatus(resp, reply.Status, []int{http.StatusOK}); err != nil {
+		return nil, err
+	}
+
+	return reply, nil
 }
 
 func (c Client) StreamCreate(stream *msg.StreamRequest) (*msg.StreamReply, error) {
@@ -95,26 +105,20 @@ func (c Client) StreamCreate(stream *msg.StreamRequest) (*msg.StreamReply, error
 
 	c.debugResponse(resp)
 
-	// if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
-	// 	return nil, errContentType(ct)
-	// }
-	//
-	// reply := &msg.QueryReply{}
-	// if err = h.ParseResp(resp.Body, reply); err != nil {
-	// 	return nil, err
-	// }
-	//
-	// if err := checkStatus(resp, reply.Status, []int{http.StatusCreated}); err != nil {
-	// 	return nil, err
-	// }
-	//
-	// if len(reply.RequestId) == 0 {
-	// 	return nil, errMissingRequestID
-	// }
-	//
-	// return reply, nil
+	if ct := resp.Header.Get("Content-Type"); ct != req.Header.Get("Accept") {
+		return nil, errContentType(ct)
+	}
 
-	return nil, nil
+	reply := &msg.StreamReply{}
+	if err = h.ParseResp(resp.Body, reply); err != nil {
+		return nil, err
+	}
+
+	if err := checkStatus(resp, reply.Status, []int{http.StatusCreated}); err != nil {
+		return nil, err
+	}
+
+	return reply, nil
 }
 
 func (c Client) StreamUpdate(uuid string, stream *msg.StreamRequest) (*msg.StreamReply, error) {
