@@ -1,3 +1,8 @@
+2017-05-08  Luke <lkingland@zvelo.com>
+
+  * Start feature "cli"
+  https://www.pivotaltracker.com/story/show/145054523
+
 2016-07-26  RJ Nanjegowda <rnanjegowda@zvelo.com>
 
   * Start feature "refactor to use cli lib"
