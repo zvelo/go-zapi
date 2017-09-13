@@ -1,5 +1,0 @@
-2016-07-26  RJ Nanjegowda <rnanjegowda@zvelo.com>
-
-  * Start feature "refactor to use cli lib"
-  https://www.pivotaltracker.com/story/show/127121463
-  https://github.com/zvelo/go-zapi/pull/1

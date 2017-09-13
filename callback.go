@@ -1,36 +1,29 @@
 package zapi
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"zvelo.io/msg"
 )
 
-func (c Client) ProcessCallback(req *http.Request) (*msg.QueryResult, error) {
-	defer func() { _ = req.Body.Close() }()
+type Handler interface {
+	Handle(*msg.QueryResult)
+}
 
-	c.debugRequest(req)
+type HandlerFunc func(*msg.QueryResult)
 
-	var h handler
+func (f HandlerFunc) Handle(in *msg.QueryResult) {
+	f(in)
+}
 
-	ct := req.Header.Get("Content-Type")
-	if ct == queryResultType {
-		h = pbHandler{}
-	} else if ct == queryResultType+jsonMIMESuffix {
-		h = jsonHandler{}
-	} else {
-		return nil, errContentType(ct)
-	}
+var _ Handler = (*HandlerFunc)(nil)
 
-	result := &msg.QueryResult{}
-	if err := h.ParseResp(req.Body, result); err != nil {
-		return nil, err
-	}
-
-	// TODO(jrubin) both OK and Accepted here or just OK?
-	if err := checkStatus(nil, result.Status, []int{http.StatusOK, http.StatusAccepted}); err != nil {
-		return nil, err
-	}
-
-	return result, nil
+func CallbackHandler(h Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var result msg.QueryResult
+		if err := json.NewDecoder(r.Body).Decode(&result); err == nil {
+			h.Handle(&result)
+		}
+	})
 }
