@@ -2,15 +2,14 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
 	"text/tabwriter"
 	"text/template"
-	"time"
 
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 
 	"google.golang.org/grpc"
@@ -21,10 +20,8 @@ import (
 )
 
 var (
-	queryReq          msg.QueryURLRequests
-	queryListen       string
-	queryPollInterval time.Duration
-	queryTimeout      time.Duration
+	queryReq    msg.QueryURLRequests
+	queryListen string
 
 	queryCh = make(chan *msg.QueryResult)
 )
@@ -49,20 +46,6 @@ func init() {
 				EnvVar:      "ZVELO_QUERY_CALLBACK_URL",
 				Usage:       "publicly accessible base URL that routes to the address used by -listen flag",
 				Destination: &queryReq.Callback,
-			},
-			cli.DurationFlag{
-				Name:        "poll-interval",
-				EnvVar:      "ZVELO_QUERY_POLL_INTERVAL",
-				Usage:       "repeatedly poll after this much time has elapsed until the query is marked as complete",
-				Value:       1 * time.Second,
-				Destination: &queryPollInterval,
-			},
-			cli.DurationFlag{
-				Name:        "timeout",
-				EnvVar:      "ZVELO_QUERY_TIMEOUT",
-				Usage:       "maximum amount of time to wait for query results to complete",
-				Value:       15 * time.Minute,
-				Destination: &queryTimeout,
 			},
 			cli.BoolFlag{
 				Name:        "partial-results",
@@ -102,7 +85,7 @@ func setupQuery(c *cli.Context) error {
 		go func() {
 			_ = http.ListenAndServe(
 				queryListen,
-				zapi.CallbackHandler(callbackHandler()),
+				zapi.CallbackHandler(callbackHandler(), zapiOpts...),
 			)
 		}()
 	}
@@ -117,7 +100,7 @@ func callbackHandler() zapi.Handler {
 }
 
 func query(_ *cli.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), queryTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	if rest {
@@ -158,7 +141,7 @@ func queryGRPC(ctx context.Context) error {
 	return queryWait(ctx, traceID, replies.Replies)
 }
 
-var tplStr = `
+var queryResultTplStr = `
 {{define "DataSet" -}}
 {{- if .Categorization -}}
 Categories:         {{range .Categorization.Values}}{{category .}} {{end}}
@@ -200,7 +183,7 @@ Requested Datasets: {{range .RequestDataset}}{{dataset .}} {{end}}
 {{- if .QueryStatus}}{{template "QueryStatus" .QueryStatus}}{{end}}
 {{- end}}`
 
-var tpl = template.Must(template.New("QueryResult").Funcs(template.FuncMap{
+var queryResultTpl = template.Must(template.New("QueryResult").Funcs(template.FuncMap{
 	"dataset": func(i uint32) string {
 		return msg.DataSetType(i).String()
 	},
@@ -211,7 +194,7 @@ var tpl = template.Must(template.New("QueryResult").Funcs(template.FuncMap{
 	"httpStatus": func(i int32) string {
 		return fmt.Sprintf("%s(%d)", http.StatusText(int(i)), i)
 	},
-}).Parse(tplStr))
+}).Parse(queryResultTplStr))
 
 func queryWait(ctx context.Context, traceID string, replies []*msg.QueryReply) error {
 	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
@@ -235,7 +218,7 @@ func queryWait(ctx context.Context, traceID string, replies []*msg.QueryReply) e
 	}
 
 	if queryReq.Poll {
-		return queryPoll(ctx, reqIDs)
+		return pollReqIDs(ctx, reqIDs)
 	}
 
 	return nil
@@ -252,7 +235,7 @@ func queryWaitCallback(ctx context.Context) error {
 			fmt.Fprintf(os.Stderr, "\nreceived callback\n")
 
 			fmt.Println()
-			if err := tpl.ExecuteTemplate(os.Stdout, "QueryResult", result); err != nil {
+			if err := queryResultTpl.ExecuteTemplate(os.Stdout, "QueryResult", result); err != nil {
 				return err
 			}
 
@@ -265,76 +248,4 @@ func queryWaitCallback(ctx context.Context) error {
 			}
 		}
 	}
-}
-
-func queryPollREST(ctx context.Context, reqID string) (*msg.QueryResult, string, error) {
-	req := msg.QueryPollRequest{RequestId: reqID}
-	var resp *http.Response
-	result, err := restClient.QueryContentResultV1(ctx, &req, zapi.Response(&resp))
-	traceID := resp.Header.Get("trace-id")
-	return result, traceID, err
-}
-
-func queryPollGRPC(ctx context.Context, reqID string) (*msg.QueryResult, string, error) {
-	req := msg.QueryPollRequest{RequestId: reqID}
-	if forceTrace {
-		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
-			"jaeger-debug-id", randString(32),
-		))
-	}
-	var header metadata.MD
-	result, err := grpcClient.QueryContentResultV1(ctx, &req, grpc.Header(&header))
-	var traceID string
-	if tids, ok := header["trace-id"]; ok && len(tids) > 0 {
-		traceID = tids[0]
-	}
-	return result, traceID, err
-}
-
-func queryPoll(ctx context.Context, reqIDs map[string]string) error {
-	var result *msg.QueryResult
-	var err error
-
-	polling := map[string]string{}
-	for reqID, url := range reqIDs {
-		polling[reqID] = url
-	}
-
-	for len(polling) > 0 {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(queryPollInterval):
-		}
-
-		for reqID, url := range polling {
-			fmt.Fprintf(os.Stderr, "\npolling for: %s (%s)\n", url, reqID)
-
-			var traceID string
-
-			if rest {
-				result, traceID, err = queryPollREST(ctx, reqID)
-			} else {
-				result, traceID, err = queryPollGRPC(ctx, reqID)
-			}
-
-			if err != nil {
-				return err
-			}
-
-			fmt.Println()
-			if traceID != "" {
-				fmt.Fprintf(os.Stderr, "Trace ID:           %s\n", traceID)
-			}
-			if err := tpl.ExecuteTemplate(os.Stdout, "QueryResult", result); err != nil {
-				return err
-			}
-
-			if result != nil && result.QueryStatus != nil && result.QueryStatus.Complete {
-				delete(polling, reqID)
-			}
-		}
-	}
-
-	return nil
 }

@@ -3,33 +3,47 @@ package main
 import (
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
 	"runtime"
 	"strings"
+	"time"
 
+	"golang.org/x/oauth2"
+
+	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+
 	"zvelo.io/go-zapi"
+	"zvelo.io/go-zapi/tokensource"
 	"zvelo.io/msg"
 )
 
 const name = "zapi"
 
 var (
-	endpoint               string
-	debug, rest            bool
-	clientID, clientSecret string
-	restClient             zapi.RESTClient
-	grpcClient             zapi.GRPCClient
-	datasets               []uint32
-	forceTrace             bool
+	endpoint           string
+	debug, rest        bool
+	restClient         zapi.RESTClient
+	grpcClient         zapi.GRPCClient
+	datasets           []uint32
+	forceTrace         bool
+	pollInterval       time.Duration
+	timeout            time.Duration
+	noCacheToken       bool
+	zapiOpts           []zapi.Option
+	tokenSource        oauth2.TokenSource
+	useUserCredentials bool
+	scopes             cli.StringSlice
+	datasetStrings     cli.StringSlice
 
-	version        = "1.0.0"
-	datasetStrings = cli.StringSlice([]string{"CATEGORIZATION"})
-	scopes         = cli.StringSlice(strings.Fields(zapi.DefaultScopes))
-	app            = cli.NewApp()
+	version         = "1.0.0"
+	app             = cli.NewApp()
+	oauth2Config    = oauth2.Config{Endpoint: zapi.Endpoint}
+	userCredentials = &userAccreditor{Config: &oauth2Config}
+	defaultScopes   = strings.Fields(zapi.DefaultScopes)
+	defaultDatasets = []string{msg.CATEGORIZATION.String()}
 )
 
 func init() {
@@ -59,13 +73,53 @@ func init() {
 			Name:        "client-id",
 			EnvVar:      "ZVELO_CLIENT_ID",
 			Usage:       "oauth2 client id",
-			Destination: &clientID,
+			Destination: &oauth2Config.ClientID,
 		},
 		cli.StringFlag{
 			Name:        "client-secret",
 			EnvVar:      "ZVELO_CLIENT_SECRET",
 			Usage:       "oauth2 client secret",
-			Destination: &clientSecret,
+			Destination: &oauth2Config.ClientSecret,
+		},
+		cli.BoolFlag{
+			Name:        "use-user-credentials",
+			EnvVar:      "ZVELO_USE_USER_CREDENTIALS",
+			Usage:       "use user, 3 legged oauth2, credentials instead of client credentials",
+			Destination: &useUserCredentials,
+		},
+		cli.StringFlag{
+			Name:        "oauth2-callback-url",
+			EnvVar:      "ZVELO_OAUTH2_CALLBACK_URL",
+			Usage:       "url that server will redirect to for oauth2 callbacks",
+			Value:       "http://localhost:4445/callback",
+			Destination: &oauth2Config.RedirectURL,
+		},
+		cli.StringFlag{
+			Name:        "oauth2-callback-addr",
+			EnvVar:      "ZVELO_OAUTH2_CALLBACK_ADDR",
+			Usage:       "addr:port that server will listen to for oauth2 callbacks",
+			Value:       "localhost:4445",
+			Destination: &userCredentials.Addr,
+		},
+		cli.BoolFlag{
+			Name:        "oauth2-no-open-in-browser",
+			EnvVar:      "ZVELO_OAUTH2_NO_OPEN_IN_BROWSER",
+			Usage:       "don't open the auth url in the browser",
+			Destination: &userCredentials.NoOpen,
+		},
+		cli.DurationFlag{
+			Name:        "poll-interval",
+			EnvVar:      "ZVELO_POLL_INTERVAL",
+			Usage:       "repeatedly poll after this much time has elapsed until the request is marked as complete",
+			Value:       1 * time.Second,
+			Destination: &pollInterval,
+		},
+		cli.DurationFlag{
+			Name:        "timeout",
+			EnvVar:      "ZVELO_TIMEOUT",
+			Usage:       "maximum amount of time to wait for results to complete",
+			Value:       15 * time.Minute,
+			Destination: &timeout,
 		},
 		cli.BoolFlag{
 			Name:        "rest",
@@ -73,16 +127,22 @@ func init() {
 			Usage:       "Use REST instead of gRPC for api requests",
 			Destination: &rest,
 		},
+		cli.BoolFlag{
+			Name:        "no-cache-token",
+			EnvVar:      "ZVELO_NO_CACHE_TOKEN",
+			Usage:       "don't cache received oauth2 tokens to the filesystem",
+			Destination: &noCacheToken,
+		},
 		cli.StringSliceFlag{
-			Name:   "datasets",
+			Name:   "dataset",
 			EnvVar: "ZVELO_DATASETS",
-			Usage:  "list of datasets to retrieve (available options: " + strings.Join(availableDS(), ", ") + ")",
+			Usage:  "list of datasets to retrieve, may be repeated (available options: " + strings.Join(availableDS(), ", ") + ", default: " + strings.Join(defaultDatasets, ", ") + ")",
 			Value:  &datasetStrings,
 		},
 		cli.StringSliceFlag{
-			Name:   "scopes",
+			Name:   "scope",
 			EnvVar: "ZVELO_SCOPES",
-			Usage:  "scopes to request with the token",
+			Usage:  "scopes to request with the token, may be repeated (default: " + strings.Join(defaultScopes, ", ") + ")",
 			Value:  &scopes,
 		},
 		cli.BoolFlag{
@@ -115,31 +175,80 @@ func randString(n int) string {
 	return string(b)
 }
 
-func globalSetup(_ *cli.Context) error {
-	tokenSourcer := zapi.ClientCredentials(clientID, clientSecret, scopes...)
+type logTokenSource struct {
+	src oauth2.TokenSource
+}
 
-	zapiOpts := []zapi.Option{
-		zapi.WithEndpoint(endpoint),
+func (s logTokenSource) Token() (*oauth2.Token, error) {
+	start := time.Now()
+
+	token, err := s.src.Token()
+
+	if debug {
+		if err == nil {
+			fmt.Fprintf(os.Stderr, "got token (%s)\n", time.Since(start))
+		} else {
+			fmt.Fprintf(os.Stderr, "error getting token: %s (%s)\n", err, time.Since(start))
+		}
 	}
+
+	return token, err
+}
+
+var _ oauth2.TokenSource = (*logTokenSource)(nil)
+
+func globalSetup(_ *cli.Context) error {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	if len(scopes) == 0 {
+		scopes = defaultScopes
+	}
+
+	oauth2Config.Scopes = scopes
+
+	tokenSource = userCredentials
+	cacheName := "user"
+
+	if !useUserCredentials {
+		cacheName = "client"
+		tokenSource = zapi.ClientCredentials(
+			oauth2Config.ClientID,
+			oauth2Config.ClientSecret,
+			scopes...,
+		).TokenSource(ctx)
+	}
+
+	zapiOpts = append(zapiOpts, zapi.WithEndpoint(endpoint))
 
 	if debug {
 		zapiOpts = append(zapiOpts, zapi.WithDebug())
 	}
 
+	if !noCacheToken {
+		tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
+	}
+
+	tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
+	tokenSource = logTokenSource{tokenSource}
+
 	if forceTrace {
 		zapiOpts = append(zapiOpts, zapi.WithForceTrace())
 	}
 
-	ts := tokenSourcer.TokenSource(context.Background())
+	restClient = zapi.NewREST(tokenSource, zapiOpts...)
 
-	restClient = zapi.NewREST(ts, zapiOpts...)
-
-	grpcDialer := zapi.NewGRPC(ts, zapiOpts...)
+	grpcDialer := zapi.NewGRPC(tokenSource, zapiOpts...)
 
 	var err error
-	grpcClient, err = grpcDialer.Dial(context.Background())
+
+	grpcClient, err = grpcDialer.Dial(ctx)
 	if err != nil {
 		return err
+	}
+
+	if len(datasetStrings) == 0 {
+		datasetStrings = defaultDatasets
 	}
 
 	for _, dsName := range datasetStrings {

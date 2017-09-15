@@ -19,8 +19,17 @@ func (f HandlerFunc) Handle(in *msg.QueryResult) {
 
 var _ Handler = (*HandlerFunc)(nil)
 
-func CallbackHandler(h Handler) http.Handler {
+func CallbackHandler(h Handler, opts ...Option) http.Handler {
+	o := defaults(nil)
+	for _, opt := range opts {
+		opt(o)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if o.debug {
+			debugRequest(r)
+		}
+
 		var result msg.QueryResult
 		if err := json.NewDecoder(r.Body).Decode(&result); err == nil {
 			h.Handle(&result)

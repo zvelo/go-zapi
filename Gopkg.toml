@@ -3,6 +3,10 @@
   version = "1.0.2"
 
 [[constraint]]
+  name = "github.com/pkg/errors"
+  version = "0.8.0"
+
+[[constraint]]
   name = "github.com/urfave/cli"
   version = "1.20.0"
 
@@ -12,4 +16,4 @@
 
 [[constraint]]
   name = "zvelo.io/msg"
-  version = "1.0.0"
+  version = "1.0.1"

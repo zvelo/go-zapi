@@ -3,9 +3,9 @@ package zapi
 import (
 	"net/http"
 
-	"golang.org/x/oauth2"
-
 	opentracing "github.com/opentracing/opentracing-go"
+
+	"golang.org/x/oauth2"
 )
 
 const (

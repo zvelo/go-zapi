@@ -17,6 +17,10 @@ func printDump(w io.Writer, dump []byte, prefix string) {
 	fmt.Fprintf(w, "\n")
 }
 
+func debugRequest(req *http.Request) {
+	debugHTTP("< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
+}
+
 func debugRequestOut(req *http.Request) {
 	debugHTTP("> ", func() ([]byte, error) { return httputil.DumpRequestOut(req, true) })
 }
