@@ -178,28 +178,6 @@ func randString(n int) string {
 	return string(b)
 }
 
-type logTokenSource struct {
-	src oauth2.TokenSource
-}
-
-func (s logTokenSource) Token() (*oauth2.Token, error) {
-	start := time.Now()
-
-	token, err := s.src.Token()
-
-	if debug {
-		if err == nil {
-			fmt.Fprintf(os.Stderr, "got token (%s)\n", time.Since(start))
-		} else {
-			fmt.Fprintf(os.Stderr, "error getting token: %s (%s)\n", err, time.Since(start))
-		}
-	}
-
-	return token, err
-}
-
-var _ oauth2.TokenSource = (*logTokenSource)(nil)
-
 func globalSetup(_ *cli.Context) error {
 	if len(scopes) == 0 {
 		scopes = defaultScopes
@@ -236,16 +214,16 @@ func globalSetup(_ *cli.Context) error {
 
 	zapiOpts = append(zapiOpts, zapi.WithEndpoint(endpoint))
 
-	if debug {
-		zapiOpts = append(zapiOpts, zapi.WithDebug())
-	}
-
 	if !noCacheToken {
 		tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
 	}
 
 	tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
-	tokenSource = logTokenSource{tokenSource}
+
+	if debug {
+		zapiOpts = append(zapiOpts, zapi.WithDebug())
+		tokenSource = tokensource.Log(tokenSource)
+	}
 
 	if forceTrace {
 		zapiOpts = append(zapiOpts, zapi.WithForceTrace())
