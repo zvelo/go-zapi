@@ -21,7 +21,7 @@ var pollOnce bool
 var pollRequestIDs []string
 
 func init() {
-	app.Commands = append(app.Commands, cli.Command{
+	cmd := cli.Command{
 		Name:      "poll",
 		Usage:     "poll for results with a request-id",
 		ArgsUsage: "request_id [request_id...]",
@@ -35,7 +35,9 @@ func init() {
 				Destination: &pollOnce,
 			},
 		},
-	})
+	}
+	cmd.BashComplete = BashCommandComplete(cmd)
+	app.Commands = append(app.Commands, cmd)
 }
 
 func setupPoll(c *cli.Context) error {

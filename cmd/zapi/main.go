@@ -53,6 +53,8 @@ func init() {
 	app.Name = name
 	app.Version = fmt.Sprintf("%s (%s)", version, runtime.Version())
 	app.Usage = "client utility for zvelo api"
+	app.EnableBashCompletion = true
+	app.BashComplete = BashComplete
 	app.Authors = []cli.Author{
 		{Name: "Joshua Rubin", Email: "jrubin@zvelo.com"},
 	}

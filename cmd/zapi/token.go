@@ -23,11 +23,13 @@ var tokenTextTplStr = `
 var tokenTextTpl = template.Must(template.New("token").Parse(tokenTextTplStr))
 
 func init() {
-	app.Commands = append(app.Commands, cli.Command{
+	cmd := cli.Command{
 		Name:   "token",
 		Usage:  "retrieve a token for use elsewhere",
 		Action: token,
-	})
+	}
+	cmd.BashComplete = BashCommandComplete(cmd)
+	app.Commands = append(app.Commands, cmd)
 }
 
 func token(_ *cli.Context) error {

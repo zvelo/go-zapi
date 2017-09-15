@@ -27,7 +27,7 @@ var (
 )
 
 func init() {
-	app.Commands = append(app.Commands, cli.Command{
+	cmd := cli.Command{
 		Name:      "query",
 		Usage:     "query for a URL",
 		ArgsUsage: "url [url...]",
@@ -60,7 +60,9 @@ func init() {
 				Destination: &queryReq.Poll,
 			},
 		},
-	})
+	}
+	cmd.BashComplete = BashCommandComplete(cmd)
+	app.Commands = append(app.Commands, cmd)
 }
 
 func setupQuery(c *cli.Context) error {
