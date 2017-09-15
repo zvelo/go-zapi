@@ -10,10 +10,12 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 
 	zapi "zvelo.io/go-zapi"
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -126,13 +128,18 @@ func pollReqID(ctx context.Context, reqID, url string) (bool, error) {
 
 	fmt.Println()
 
+	color.Set(color.FgCyan)
+
 	if traceID != "" {
 		fmt.Fprintf(os.Stderr, "Trace ID:           %s\n", traceID)
 	}
 
 	if err := queryResultTpl.ExecuteTemplate(os.Stdout, "QueryResult", result); err != nil {
+		color.Unset()
 		return false, err
 	}
+
+	color.Unset()
 
 	if result == nil || result.QueryStatus == nil {
 		return false, nil
@@ -153,7 +160,7 @@ func pollGRPC(ctx context.Context, reqID string) (*msg.QueryResult, string, erro
 	req := msg.QueryPollRequest{RequestId: reqID}
 	if forceTrace {
 		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
-			"jaeger-debug-id", randString(32),
+			"jaeger-debug-id", zvelo.RandString(32),
 		))
 	}
 	var header metadata.MD

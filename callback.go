@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -27,7 +28,7 @@ func CallbackHandler(h Handler, opts ...Option) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if o.debug {
-			debugRequest(r)
+			zvelo.DebugRequest(r)
 		}
 
 		var result msg.QueryResult

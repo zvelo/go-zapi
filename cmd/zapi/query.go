@@ -9,6 +9,7 @@ import (
 	"text/tabwriter"
 	"text/template"
 
+	"github.com/fatih/color"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
 
@@ -16,6 +17,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	zapi "zvelo.io/go-zapi"
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -125,7 +127,7 @@ func queryREST(ctx context.Context) error {
 func queryGRPC(ctx context.Context) error {
 	if forceTrace {
 		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
-			"jaeger-debug-id", randString(32),
+			"jaeger-debug-id", zvelo.RandString(32),
 		))
 	}
 
@@ -199,6 +201,8 @@ var queryResultTpl = template.Must(template.New("QueryResult").Funcs(template.Fu
 }).Parse(queryResultTplStr))
 
 func queryWait(ctx context.Context, traceID string, replies []*msg.QueryReply) error {
+	color.Set(color.FgCyan)
+
 	w := tabwriter.NewWriter(os.Stderr, 0, 0, 1, ' ', 0)
 
 	if traceID != "" {
@@ -212,8 +216,11 @@ func queryWait(ctx context.Context, traceID string, replies []*msg.QueryReply) e
 	}
 
 	if err := w.Flush(); err != nil {
+		color.Unset()
 		return err
 	}
+
+	color.Unset()
 
 	if queryReq.Callback != "" {
 		return queryWaitCallback(ctx)
@@ -237,9 +244,12 @@ func queryWaitCallback(ctx context.Context) error {
 			fmt.Fprintf(os.Stderr, "\nreceived callback\n")
 
 			fmt.Println()
+			color.Set(color.FgCyan)
 			if err := queryResultTpl.ExecuteTemplate(os.Stdout, "QueryResult", result); err != nil {
+				color.Unset()
 				return err
 			}
+			color.Unset()
 
 			if result.QueryStatus != nil && result.QueryStatus.Complete {
 				numComplete++

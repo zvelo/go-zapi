@@ -1,9 +1,9 @@
 package zapi
 
 import (
-	"crypto/rand"
-	"math/big"
 	"net/http"
+
+	"zvelo.io/go-zapi/internal/zvelo"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -14,20 +14,6 @@ var _ http.RoundTripper = (*transport)(nil)
 
 type transport struct {
 	*options
-}
-
-var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-func randString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = chars[n.Int64()]
-	}
-	return string(b)
 }
 
 func cloneRequest(r *http.Request) *http.Request {
@@ -87,11 +73,11 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if t.forceTrace {
-		req.Header.Set("jaeger-debug-id", randString(32))
+		req.Header.Set("jaeger-debug-id", zvelo.RandString(32))
 	}
 
 	if t.debug {
-		debugRequestOut(req)
+		zvelo.DebugRequestOut(req)
 	}
 
 	res, err := t.transport.RoundTrip(req)
@@ -104,7 +90,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if t.debug {
-		debugResponse(res)
+		zvelo.DebugResponse(res)
 	}
 
 	ext.HTTPStatusCode.Set(clientSpan, uint16(res.StatusCode))

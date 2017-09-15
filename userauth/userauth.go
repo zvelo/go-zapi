@@ -2,18 +2,15 @@ package userauth
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
 	"html/template"
-	"io"
-	"math/big"
 	"net/http"
-	"net/http/httputil"
 	"os"
 	"strings"
 	"sync"
 
 	zapi "zvelo.io/go-zapi"
+	"zvelo.io/go-zapi/internal/zvelo"
 
 	"github.com/pkg/browser"
 	"github.com/pkg/errors"
@@ -39,20 +36,6 @@ var tokenHTMLTplStr = `<!DOCTYPE html>
 `
 
 var tokenHTMLTpl = template.Must(template.New("token").Parse(tokenHTMLTplStr))
-
-var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-func randString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = chars[n.Int64()]
-	}
-	return string(b)
-}
 
 type userAccreditor struct {
 	sync.Mutex
@@ -145,7 +128,7 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 	a.Lock()
 	defer a.Unlock()
 
-	state := randString(32)
+	state := zvelo.RandString(32)
 
 	u := a.AuthCodeURL(state)
 
@@ -193,32 +176,10 @@ type result struct {
 	err   error
 }
 
-func debugRequest(req *http.Request) {
-	debugHTTP("< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
-}
-
-func debugHTTP(prefix string, fn func() ([]byte, error)) {
-	dump, err := fn()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-		return
-	}
-
-	printDump(os.Stderr, dump, prefix)
-}
-
-func printDump(w io.Writer, dump []byte, prefix string) {
-	parts := strings.Split(string(dump), "\n")
-	for _, line := range parts {
-		fmt.Fprintf(w, "%s%s\n", prefix, line)
-	}
-	fmt.Fprintf(w, "\n")
-}
-
 func (a *userAccreditor) handler(ctx context.Context, state string, ch chan<- result) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if a.debug {
-			debugRequest(r)
+			zvelo.DebugRequest(r)
 		}
 
 		if state == "" || state != r.URL.Query().Get("state") {

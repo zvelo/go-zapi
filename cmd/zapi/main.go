@@ -2,18 +2,16 @@ package main
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
-	"golang.org/x/oauth2"
-
 	"github.com/pkg/errors"
 	"github.com/urfave/cli"
+
+	"golang.org/x/oauth2"
 
 	"zvelo.io/go-zapi"
 	"zvelo.io/go-zapi/tokensource"
@@ -164,20 +162,6 @@ func main() {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}
-}
-
-var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
-
-func randString(n int) string {
-	b := make([]rune, n)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
-		if err != nil {
-			panic(err)
-		}
-		b[i] = chars[n.Int64()]
-	}
-	return string(b)
 }
 
 func globalSetup(_ *cli.Context) error {
