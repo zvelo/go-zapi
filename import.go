@@ -1,1 +1,1 @@
-package zapi // import "zvelo.io/zapi"
+package zapi // import "zvelo.io/go-zapi"
