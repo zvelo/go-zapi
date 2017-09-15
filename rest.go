@@ -9,6 +9,10 @@ import (
 	"path"
 	"strings"
 
+	"golang.org/x/oauth2"
+
+	"github.com/pkg/errors"
+
 	"zvelo.io/msg"
 )
 
@@ -58,8 +62,8 @@ type RESTClient interface {
 	QueryContentResultV1(context.Context, *msg.QueryPollRequest, ...CallOption) (*msg.QueryResult, error)
 }
 
-func NewREST(clientID, clientSecret string, opts ...Option) RESTClient {
-	o := defaults(clientID, clientSecret)
+func NewREST(ts oauth2.TokenSource, opts ...Option) RESTClient {
+	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
 	}
@@ -102,6 +106,10 @@ func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, o
 		opt.after(resp)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("http error: %s (%d)", resp.Status, resp.StatusCode)
+	}
+
 	var replies msg.QueryReplies
 	if err := json.NewDecoder(resp.Body).Decode(&replies); err != nil {
 		return nil, err
@@ -129,6 +137,10 @@ func (c *restClient) queryResultV1(ctx context.Context, reqID string, opts ...Ca
 
 	for _, opt := range opts {
 		opt.after(resp)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, errors.Errorf("http error: %s (%d)", resp.Status, resp.StatusCode)
 	}
 
 	var result msg.QueryResult

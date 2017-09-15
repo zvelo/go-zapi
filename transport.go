@@ -1,7 +1,12 @@
 package zapi
 
 import (
+	"crypto/rand"
+	"fmt"
+	"math/big"
 	"net/http"
+	"os"
+	"time"
 
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
@@ -12,6 +17,20 @@ var _ http.RoundTripper = (*transport)(nil)
 
 type transport struct {
 	options *options
+}
+
+var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
+func randString(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = chars[n.Int64()]
+	}
+	return string(b)
 }
 
 func cloneRequest(r *http.Request) *http.Request {
@@ -47,9 +66,15 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ext.HTTPMethod.Set(clientSpan, req.Method)
 	ext.HTTPUrl.Set(clientSpan, req.URL.String())
 
-	tokenSource := t.options.clientCredentials.TokenSource(req.Context())
+	tokenFetch := time.Now()
+	if t.options.debug {
+		fmt.Fprintf(os.Stderr, "getting token...")
+	}
+	token, err := t.options.Token()
+	if t.options.debug {
+		fmt.Fprintf(os.Stderr, " done (%v)\n", time.Since(tokenFetch))
+	}
 
-	token, err := tokenSource.Token()
 	if err != nil {
 		clientSpan.LogFields(
 			log.String("event", "TokenSource.Token() failed"),
@@ -70,6 +95,10 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 			log.String("event", "Tracer.Inject() failed"),
 			log.String("message", err.Error()),
 		)
+	}
+
+	if t.options.forceTrace {
+		req.Header.Set("jaeger-debug-id", randString(32))
 	}
 
 	if t.options.debug {

@@ -2,45 +2,40 @@ package zapi
 
 import (
 	"net/http"
-	"strings"
+
+	"golang.org/x/oauth2"
 
 	opentracing "github.com/opentracing/opentracing-go"
-
-	"golang.org/x/oauth2/clientcredentials"
 )
 
 const (
 	UserAgent       = "go-zapi v1"
 	DefaultEndpoint = "api.zvelo.com"
-	DefaultTokenURL = "https://auth.zvelo.com/oauth2/token"
-	DefaultScopes   = "zvelo.dataset"
 )
 
 type options struct {
-	clientCredentials clientcredentials.Config
-	endpoint          string
-	debug             bool
-	transport         http.RoundTripper
-	tracer            func() opentracing.Tracer
+	oauth2.TokenSource
+	endpoint   string
+	debug      bool
+	transport  http.RoundTripper
+	tracer     func() opentracing.Tracer
+	forceTrace bool
 }
 
 type Option func(*options)
 
-func defaultScopes() []string {
-	return strings.Fields(DefaultScopes)
+func defaults(ts oauth2.TokenSource) *options {
+	return &options{
+		TokenSource: ts,
+		endpoint:    DefaultEndpoint,
+		transport:   http.DefaultTransport,
+		tracer:      opentracing.GlobalTracer,
+	}
 }
 
-func defaults(clientID, clientSecret string) *options {
-	return &options{
-		endpoint:  DefaultEndpoint,
-		transport: http.DefaultTransport,
-		clientCredentials: clientcredentials.Config{
-			TokenURL:     DefaultTokenURL,
-			Scopes:       defaultScopes(),
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-		},
-		tracer: opentracing.GlobalTracer,
+func WithForceTrace() Option {
+	return func(o *options) {
+		o.forceTrace = true
 	}
 }
 
@@ -54,16 +49,6 @@ func WithTransport(val http.RoundTripper) Option {
 	}
 }
 
-func WithTokenURL(val string) Option {
-	if val == "" {
-		val = DefaultTokenURL
-	}
-
-	return func(o *options) {
-		o.clientCredentials.TokenURL = val
-	}
-}
-
 func WithTracer(val opentracing.Tracer) Option {
 	return func(o *options) {
 		if val == nil {
@@ -74,16 +59,6 @@ func WithTracer(val opentracing.Tracer) Option {
 		o.tracer = func() opentracing.Tracer {
 			return val
 		}
-	}
-}
-
-func WithScope(val ...string) Option {
-	if len(val) == 0 {
-		val = defaultScopes()
-	}
-
-	return func(o *options) {
-		o.clientCredentials.Scopes = val
 	}
 }
 

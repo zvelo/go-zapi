@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
+	"math/big"
 	"os"
+	"runtime"
 	"strings"
 
 	"github.com/urfave/cli"
@@ -10,132 +15,160 @@ import (
 	"zvelo.io/msg"
 )
 
-const (
-	name    = "zvelo-api-example-go"
-	version = "0.1.0"
-)
+const name = "zapi"
 
 var (
-	zClient  = zapi.New()
-	datasets = []msg.DataSetType{}
-	app      = initApp()
+	endpoint               string
+	debug, rest            bool
+	clientID, clientSecret string
+	restClient             zapi.RESTClient
+	grpcClient             zapi.GRPCClient
+	datasets               []uint32
+	forceTrace             bool
+
+	version        = "1.0.0"
+	datasetStrings = cli.StringSlice([]string{"CATEGORIZATION"})
+	scopes         = cli.StringSlice(strings.Fields(zapi.DefaultScopes))
+	app            = cli.NewApp()
 )
 
-func initApp() *cli.App {
-	nApp := cli.NewApp()
-	nApp.Name = name
-	nApp.Version = version
-	nApp.Usage = "example client for zvelo api"
-	nApp.Authors = []cli.Author{
+func init() {
+	app.Name = name
+	app.Version = fmt.Sprintf("%s (%s)", version, runtime.Version())
+	app.Usage = "client utility for zvelo api"
+	app.Authors = []cli.Author{
 		{Name: "Joshua Rubin", Email: "jrubin@zvelo.com"},
-		{Name: "RJ Nanjegowda", Email: "rnanjegowda@zvelo.com"},
 	}
+	app.Before = globalSetup
 
-	// Global flags
-	nApp.Flags = []cli.Flag{
+	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:   "user-agent, ua",
-			EnvVar: "ZVELO_USER_AGENT",
-			Usage:  "user-agent to use when making requests to zvelo-api",
-			Value:  name + " " + version,
-		},
-		cli.StringFlag{
-			Name:   "endpoint, ep",
-			EnvVar: "ZVELO_ENDPOINT",
-			Usage:  "URL of the API endpoint",
-			Value:  zapi.DefaultEndpoint,
+			Name:        "endpoint",
+			EnvVar:      "ZVELO_ENDPOINT",
+			Usage:       "URL of the API endpoint",
+			Value:       zapi.DefaultEndpoint,
+			Destination: &endpoint,
 		},
 		cli.BoolFlag{
-			Name:   "debug, d",
-			EnvVar: "ZVELO_DEBUG",
-			Usage:  "enable debug logging",
+			Name:        "debug",
+			EnvVar:      "ZVELO_DEBUG",
+			Usage:       "enable debug logging",
+			Destination: &debug,
 		},
 		cli.StringFlag{
-			Name:   "token, tk",
-			EnvVar: "ZVELO_TOKEN",
-			Usage:  "Token for making the query",
+			Name:        "client-id",
+			EnvVar:      "ZVELO_CLIENT_ID",
+			Usage:       "oauth2 client id",
+			Destination: &clientID,
 		},
 		cli.StringFlag{
-			Name:   "username, u",
-			EnvVar: "ZVELO_USERNAME",
-			Usage:  "Username to obtain a token",
-		},
-		cli.StringFlag{
-			Name:   "password, p",
-			EnvVar: "ZVELO_PASSWORD",
-			Usage:  "Password to obtain a token",
-		},
-		cli.DurationFlag{
-			Name:  "timeout, to",
-			Usage: "timeout after this much time has elapsed",
-			Value: zapi.DefaultPollTimeout,
-		},
-		cli.DurationFlag{
-			Name:  "interval, in",
-			Usage: "amount of time between polling requests",
-			Value: zapi.DefaultPollInterval,
+			Name:        "client-secret",
+			EnvVar:      "ZVELO_CLIENT_SECRET",
+			Usage:       "oauth2 client secret",
+			Destination: &clientSecret,
 		},
 		cli.BoolFlag{
-			Name:   "json, j",
-			EnvVar: "ZVELO_JSON",
-			Usage:  "Use json instead of protocol buffers for api requests",
+			Name:        "rest",
+			EnvVar:      "ZVELO_REST",
+			Usage:       "Use REST instead of gRPC for api requests",
+			Destination: &rest,
 		},
 		cli.StringSliceFlag{
-			Name:   "dataset, ds",
-			EnvVar: "ZVELO_DATASET",
+			Name:   "datasets",
+			EnvVar: "ZVELO_DATASETS",
 			Usage:  "list of datasets to retrieve (available options: " + strings.Join(availableDS(), ", ") + ")",
+			Value:  &datasetStrings,
+		},
+		cli.StringSliceFlag{
+			Name:   "scopes",
+			EnvVar: "ZVELO_SCOPES",
+			Usage:  "scopes to request with the token",
+			Value:  &scopes,
+		},
+		cli.BoolFlag{
+			Name:        "force-trace",
+			EnvVar:      "ZVELO_FORCE_TRACE",
+			Usage:       "force a trace to be generated for each request",
+			Destination: &forceTrace,
 		},
 	}
-	return nApp
 }
 
 func main() {
 	if err := app.Run(os.Args); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
 	}
 }
 
-func setupClient(c *cli.Context) error {
-	zClient.Endpoint, zClient.UserAgent, zClient.Debug = c.GlobalString("endpoint"), c.GlobalString("useragent"), c.GlobalBool("debug")
-	zClient.Token, zClient.Username, zClient.Password = c.GlobalString("token"), c.GlobalString("username"), c.GlobalString("password")
-	zClient.PollTimeout, zClient.PollInterval = c.GlobalDuration("timeout"), c.GlobalDuration("interval")
-	zClient.JSON = c.GlobalBool("json")
+var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 
-	if len(zClient.Token) == 0 &&
-		(len(zClient.Username) == 0 || len(zClient.Password) == 0) {
-		return fmt.Errorf("-token or -username and -password are required")
+func randString(n int) string {
+	b := make([]rune, n)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(chars))))
+		if err != nil {
+			panic(err)
+		}
+		b[i] = chars[n.Int64()]
 	}
-
-	return nil
+	return string(b)
 }
 
-func setupDS(c *cli.Context) error {
-	for _, dsName := range c.GlobalStringSlice("dataset") {
-		dst, err := msg.NewDataSetType(strings.TrimSpace(dsName))
+func globalSetup(_ *cli.Context) error {
+	tokenSourcer := zapi.ClientCredentials(clientID, clientSecret, scopes...)
+
+	zapiOpts := []zapi.Option{
+		zapi.WithEndpoint(endpoint),
+	}
+
+	if debug {
+		zapiOpts = append(zapiOpts, zapi.WithDebug())
+	}
+
+	if forceTrace {
+		zapiOpts = append(zapiOpts, zapi.WithForceTrace())
+	}
+
+	ts := tokenSourcer.TokenSource(context.Background())
+
+	restClient = zapi.NewREST(ts, zapiOpts...)
+
+	grpcDialer := zapi.NewGRPC(ts, zapiOpts...)
+
+	var err error
+	grpcClient, err = grpcDialer.Dial(context.Background())
+	if err != nil {
+		return err
+	}
+
+	for _, dsName := range datasetStrings {
+		dsName = strings.TrimSpace(dsName)
+
+		dst, err := msg.NewDataSetType(dsName)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "invalid dataset type: %s\n", dsName)
 			continue
 		}
-		datasets = append(datasets, dst)
+
+		datasets = append(datasets, uint32(dst))
 	}
 
 	if len(datasets) == 0 {
-		return fmt.Errorf("at least one valid dataset is required")
+		return errors.New("at least one valid dataset is required")
 	}
 
 	return nil
 }
 
 func availableDS() []string {
-	allDatasets := make([]string, len(msg.DataSetType_name)-1)
-	i := 0
+	var ds []string
 	for dst, name := range msg.DataSetType_name {
-		if dst == int32(msg.DataSetType_ECHO) {
+		if dst == int32(msg.ECHO) {
 			continue
 		}
 
-		allDatasets[i] = name
-		i++
+		ds = append(ds, name)
 	}
-	return allDatasets
+	return ds
 }

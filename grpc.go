@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"golang.org/x/oauth2"
+
 	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 
 	"google.golang.org/grpc"
@@ -69,7 +71,7 @@ func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClie
 		append(opts,
 			grpc.WithTransportCredentials(credentials.NewTLS(nil)),
 			grpc.WithPerRPCCredentials(oauth.TokenSource{
-				TokenSource: d.options.clientCredentials.TokenSource(ctx),
+				TokenSource: d.options,
 			}),
 			grpc.WithUnaryInterceptor(
 				otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
@@ -87,8 +89,8 @@ func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClie
 	}, nil
 }
 
-func NewGRPC(clientID, clientSecret string, opts ...Option) GRPCDialer {
-	o := defaults(clientID, clientSecret)
+func NewGRPC(ts oauth2.TokenSource, opts ...Option) GRPCDialer {
+	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
 	}
