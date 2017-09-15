@@ -17,31 +17,34 @@ import (
 
 	"zvelo.io/go-zapi"
 	"zvelo.io/go-zapi/tokensource"
+	"zvelo.io/go-zapi/userauth"
 	"zvelo.io/msg"
 )
 
 const name = "zapi"
 
 var (
-	endpoint           string
-	debug, rest        bool
-	restClient         zapi.RESTClient
-	grpcClient         zapi.GRPCClient
-	datasets           []uint32
-	forceTrace         bool
-	pollInterval       time.Duration
-	timeout            time.Duration
-	noCacheToken       bool
-	zapiOpts           []zapi.Option
-	tokenSource        oauth2.TokenSource
-	useUserCredentials bool
-	scopes             cli.StringSlice
-	datasetStrings     cli.StringSlice
+	endpoint               string
+	debug, rest            bool
+	restClient             zapi.RESTClient
+	grpcClient             zapi.GRPCClient
+	datasets               []uint32
+	forceTrace             bool
+	pollInterval           time.Duration
+	timeout                time.Duration
+	noCacheToken           bool
+	zapiOpts               []zapi.Option
+	tokenSource            oauth2.TokenSource
+	useUserCredentials     bool
+	scopes                 cli.StringSlice
+	datasetStrings         cli.StringSlice
+	clientID, clientSecret string
+	redirectURL            string
+	callbackAddr           string
+	noOpenBrowser          bool
 
 	version         = "1.0.0"
 	app             = cli.NewApp()
-	oauth2Config    = oauth2.Config{Endpoint: zapi.Endpoint}
-	userCredentials = &userAccreditor{Config: &oauth2Config}
 	defaultScopes   = strings.Fields(zapi.DefaultScopes)
 	defaultDatasets = []string{msg.CATEGORIZATION.String()}
 )
@@ -73,13 +76,13 @@ func init() {
 			Name:        "client-id",
 			EnvVar:      "ZVELO_CLIENT_ID",
 			Usage:       "oauth2 client id",
-			Destination: &oauth2Config.ClientID,
+			Destination: &clientID,
 		},
 		cli.StringFlag{
 			Name:        "client-secret",
 			EnvVar:      "ZVELO_CLIENT_SECRET",
 			Usage:       "oauth2 client secret",
-			Destination: &oauth2Config.ClientSecret,
+			Destination: &clientSecret,
 		},
 		cli.BoolFlag{
 			Name:        "use-user-credentials",
@@ -91,21 +94,21 @@ func init() {
 			Name:        "oauth2-callback-url",
 			EnvVar:      "ZVELO_OAUTH2_CALLBACK_URL",
 			Usage:       "url that server will redirect to for oauth2 callbacks",
-			Value:       "http://localhost:4445/callback",
-			Destination: &oauth2Config.RedirectURL,
+			Value:       userauth.DefaultRedirectURL,
+			Destination: &redirectURL,
 		},
 		cli.StringFlag{
 			Name:        "oauth2-callback-addr",
 			EnvVar:      "ZVELO_OAUTH2_CALLBACK_ADDR",
 			Usage:       "addr:port that server will listen to for oauth2 callbacks",
-			Value:       "localhost:4445",
-			Destination: &userCredentials.Addr,
+			Value:       userauth.DefaultCallbackAddr,
+			Destination: &callbackAddr,
 		},
 		cli.BoolFlag{
 			Name:        "oauth2-no-open-in-browser",
 			EnvVar:      "ZVELO_OAUTH2_NO_OPEN_IN_BROWSER",
 			Usage:       "don't open the auth url in the browser",
-			Destination: &userCredentials.NoOpen,
+			Destination: &noOpenBrowser,
 		},
 		cli.DurationFlag{
 			Name:        "poll-interval",
@@ -198,25 +201,37 @@ func (s logTokenSource) Token() (*oauth2.Token, error) {
 var _ oauth2.TokenSource = (*logTokenSource)(nil)
 
 func globalSetup(_ *cli.Context) error {
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
-
 	if len(scopes) == 0 {
 		scopes = defaultScopes
 	}
 
-	oauth2Config.Scopes = scopes
+	var cacheName string
 
-	tokenSource = userCredentials
-	cacheName := "user"
+	if useUserCredentials {
+		cacheName = "user"
+		userOpts := []userauth.Option{
+			userauth.WithRedirectURL(redirectURL),
+			userauth.WithScope(scopes...),
+			userauth.WithCallbackAddr(callbackAddr),
+		}
 
-	if !useUserCredentials {
+		if noOpenBrowser {
+			userOpts = append(userOpts, userauth.WithoutOpen())
+		}
+
+		if debug {
+			userOpts = append(userOpts, userauth.WithDebug())
+		}
+
+		tokenSource = userauth.TokenSource(context.Background(), clientID, clientSecret, userOpts...)
+	} else {
 		cacheName = "client"
 		tokenSource = zapi.ClientCredentials(
-			oauth2Config.ClientID,
-			oauth2Config.ClientSecret,
+			context.Background(),
+			clientID,
+			clientSecret,
 			scopes...,
-		).TokenSource(ctx)
+		)
 	}
 
 	zapiOpts = append(zapiOpts, zapi.WithEndpoint(endpoint))
@@ -242,7 +257,7 @@ func globalSetup(_ *cli.Context) error {
 
 	var err error
 
-	grpcClient, err = grpcDialer.Dial(ctx)
+	grpcClient, err = grpcDialer.Dial(context.Background())
 	if err != nil {
 		return err
 	}
