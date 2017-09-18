@@ -22,7 +22,7 @@ import (
 const name = "zapi"
 
 var (
-	endpoint               string
+	host                   string
 	debug, rest            bool
 	restClient             zapi.RESTClient
 	grpcClient             zapi.GRPCClient
@@ -52,7 +52,7 @@ func init() {
 	app.Version = fmt.Sprintf("%s (%s)", version, runtime.Version())
 	app.Usage = "client utility for zvelo api"
 	app.EnableBashCompletion = true
-	app.BashComplete = BashComplete
+	app.BashComplete = bashComplete
 	app.Authors = []cli.Author{
 		{Name: "Joshua Rubin", Email: "jrubin@zvelo.com"},
 	}
@@ -60,11 +60,11 @@ func init() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "endpoint",
-			EnvVar:      "ZVELO_ENDPOINT",
-			Usage:       "URL of the API endpoint",
-			Value:       zapi.DefaultEndpoint,
-			Destination: &endpoint,
+			Name:        "host",
+			EnvVar:      "ZVELO_HOST",
+			Usage:       "hostname of the API endpoint",
+			Value:       zapi.DefaultHost,
+			Destination: &host,
 		},
 		cli.BoolFlag{
 			Name:        "debug",
@@ -198,7 +198,7 @@ func globalSetup(_ *cli.Context) error {
 		)
 	}
 
-	zapiOpts = append(zapiOpts, zapi.WithEndpoint(endpoint))
+	zapiOpts = append(zapiOpts, zapi.WithHost(host))
 
 	if !noCacheToken {
 		tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)

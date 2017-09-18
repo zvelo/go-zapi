@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	zapi "zvelo.io/go-zapi"
-	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -63,7 +62,7 @@ func init() {
 			},
 		},
 	}
-	cmd.BashComplete = BashCommandComplete(cmd)
+	cmd.BashComplete = bashCommandComplete(cmd)
 	app.Commands = append(app.Commands, cmd)
 }
 
@@ -125,12 +124,6 @@ func queryREST(ctx context.Context) error {
 }
 
 func queryGRPC(ctx context.Context) error {
-	if forceTrace {
-		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
-			"jaeger-debug-id", zvelo.RandString(32),
-		))
-	}
-
 	var header metadata.MD
 	replies, err := grpcClient.QueryURLV1(ctx, &queryReq, grpc.Header(&header))
 	if err != nil {

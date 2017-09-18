@@ -28,17 +28,17 @@ func init() {
 	})
 }
 
-func BashComplete(c *cli.Context) {
-	bashComplete(c, c.App.Commands, c.App.Flags)
+func bashComplete(c *cli.Context) {
+	complete(c, c.App.Commands, c.App.Flags)
 }
 
-func BashCommandComplete(cmd cli.Command) cli.BashCompleteFunc {
+func bashCommandComplete(cmd cli.Command) cli.BashCompleteFunc {
 	return func(c *cli.Context) {
-		bashComplete(c, cmd.Subcommands, cmd.Flags)
+		complete(c, cmd.Subcommands, cmd.Flags)
 	}
 }
 
-func bashComplete(c *cli.Context, cmds []cli.Command, flags []cli.Flag) {
+func complete(c *cli.Context, cmds []cli.Command, flags []cli.Flag) {
 	for _, command := range cmds {
 		if command.Hidden {
 			continue

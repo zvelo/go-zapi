@@ -28,7 +28,7 @@ func init() {
 		Usage:  "retrieve a token for use elsewhere",
 		Action: token,
 	}
-	cmd.BashComplete = BashCommandComplete(cmd)
+	cmd.BashComplete = bashCommandComplete(cmd)
 	app.Commands = append(app.Commands, cmd)
 }
 

@@ -28,6 +28,7 @@ func (s logTokenSource) Token() (*oauth2.Token, error) {
 
 var _ oauth2.TokenSource = (*logTokenSource)(nil)
 
+// Log returns an oauth2.TokenSource that will log debug information to stderr
 func Log(src oauth2.TokenSource) oauth2.TokenSource {
 	return logTokenSource{src: src}
 }

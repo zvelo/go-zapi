@@ -16,6 +16,10 @@ type fileCache struct {
 	fileName string
 }
 
+// FileCache returns an oauth2.TokenSource that will cache tokens in the
+// filesystem. On unix systems this will be in $XDG_DATA_HOME/<app> (or
+// ~/.local/share/<app>). On windows systems this will be in
+// %%LOCALAPPDATA%%/<app> (or C:\Users\<username>\AppData\Local\<app>).
 func FileCache(src oauth2.TokenSource, app, name string, scopes ...string) oauth2.TokenSource {
 	hash := sha256.New()
 

@@ -48,17 +48,24 @@ type userAccreditor struct {
 
 var _ oauth2.TokenSource = (*userAccreditor)(nil)
 
-const (
-	DefaultCallbackAddr = ":4445"
-	DefaultRedirectURL  = "http://localhost:4445/callback"
-)
+// DefaultCallbackAddr is the default address:host on which a local http.Server
+// will be started. It can be overridden using WithCallbackAddr.
+const DefaultCallbackAddr = ":4445"
+
+// DefaultRedirectURL is the default RedirectURL that the oauth2 flow will use.
+// It can be overridden using WithRedirectURL.
+const DefaultRedirectURL = "http://localhost:4445/callback"
 
 func defaultScopes() []string {
 	return strings.Fields(zapi.DefaultScopes)
 }
 
+// An Option is used to configure the oauth2 user credential flow.
 type Option func(*userAccreditor)
 
+// WithRedirectURL returns an Option that specifies the RedirectURL that will be
+// used by the oauth2 flow. The client must be configured on the oauth2 server
+// to permit this value or else the flow will fail.
 func WithRedirectURL(val string) Option {
 	if val == "" {
 		val = DefaultRedirectURL
@@ -69,6 +76,8 @@ func WithRedirectURL(val string) Option {
 	}
 }
 
+// WithScope returns an Option that specifies the scopes that will be requested
+// for the token. If not specified, zapi.DefaultScopes will be used.
 func WithScope(val ...string) Option {
 	if len(val) == 0 {
 		val = defaultScopes()
@@ -79,6 +88,9 @@ func WithScope(val ...string) Option {
 	}
 }
 
+// WithCallbackAddr returns an Option that specifies the address:host on which a
+// local http.Server will be configured to listen for the redirect. It should be
+// reachable by going to the RedirectURL.
 func WithCallbackAddr(val string) Option {
 	if val == "" {
 		val = DefaultCallbackAddr
@@ -89,12 +101,17 @@ func WithCallbackAddr(val string) Option {
 	}
 }
 
+// WithoutOpen returns an Option that will prevent a browser window from being
+// opened automatically and will instead direct the user to open the url emitted
+// on stderr.
 func WithoutOpen() Option {
 	return func(a *userAccreditor) {
 		a.open = false
 	}
 }
 
+// WithDebug returns an option that causes incoming http.Requests to the
+// callback server to be logged to stderr.
 func WithDebug() Option {
 	return func(a *userAccreditor) {
 		a.debug = true
@@ -116,6 +133,8 @@ func defaults(ctx context.Context, clientID, clientSecret string) *userAccredito
 	}
 }
 
+// TokenSource returns an oauth2.TokenSource that will provide tokens using the
+// three legged oauth2 flow.
 func TokenSource(ctx context.Context, clientID, clientSecret string, opts ...Option) oauth2.TokenSource {
 	a := defaults(ctx, clientID, clientSecret)
 	for _, opt := range opts {

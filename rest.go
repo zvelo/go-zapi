@@ -21,7 +21,7 @@ const (
 	queryContentV1Path = "/v1/queries/content"
 )
 
-func restEndpoint(base, dir string) (string, error) {
+func restURL(base, dir string) (string, error) {
 	if !strings.Contains(base, "://") {
 		base = "https://" + base
 	}
@@ -41,6 +41,9 @@ type restClient struct {
 	client  *http.Client
 }
 
+// CallOption configures a Call before it starts or extracts information from
+// a Call after it completes. It is only used with the RESTClient.
+// grpc.CallOption is still available for the GRPCClient.
 type CallOption interface {
 	after(*http.Response)
 }
@@ -49,12 +52,18 @@ type afterCall func(*http.Response)
 
 func (o afterCall) after(resp *http.Response) { o(resp) }
 
+// Response will return the entire http.Response received from a zveloAPI call.
+// This is useful to request or response headers, see http error messages, read
+// the raw body and more.
 func Response(h **http.Response) CallOption {
 	return afterCall(func(resp *http.Response) {
 		*h = resp
 	})
 }
 
+// A RESTClient implements a very similar interface to GRPCClient but uses a
+// standard HTTP/REST transport instead of gRPC. Generally the gRPC client is
+// preferred for its efficiency.
 type RESTClient interface {
 	QueryURLV1(context.Context, *msg.QueryURLRequests, ...CallOption) (*msg.QueryReplies, error)
 	QueryURLResultV1(context.Context, *msg.QueryPollRequest, ...CallOption) (*msg.QueryResult, error)
@@ -62,6 +71,7 @@ type RESTClient interface {
 	QueryContentResultV1(context.Context, *msg.QueryPollRequest, ...CallOption) (*msg.QueryResult, error)
 }
 
+// NewREST returns a properly configured RESTClient
 func NewREST(ts oauth2.TokenSource, opts ...Option) RESTClient {
 	o := defaults(ts)
 	for _, opt := range opts {
@@ -79,7 +89,7 @@ func (c *restClient) do(ctx context.Context, req *http.Request) (*http.Response,
 }
 
 func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, opts ...CallOption) (*msg.QueryReplies, error) {
-	endpoint, err := restEndpoint(c.options.endpoint, path)
+	url, err := restURL(c.options.host, path)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +99,7 @@ func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, o
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", endpoint, bytes.NewReader(data))
+	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
 	if err != nil {
 		return nil, err
 	}
@@ -119,12 +129,12 @@ func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, o
 }
 
 func (c *restClient) queryResultV1(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
-	endpoint, err := restEndpoint(c.options.endpoint, path.Join(queryURLV1Path, reqID))
+	url, err := restURL(c.options.host, path.Join(queryURLV1Path, reqID))
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("GET", endpoint, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -15,7 +15,6 @@ import (
 	"github.com/urfave/cli"
 
 	zapi "zvelo.io/go-zapi"
-	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -38,7 +37,7 @@ func init() {
 			},
 		},
 	}
-	cmd.BashComplete = BashCommandComplete(cmd)
+	cmd.BashComplete = bashCommandComplete(cmd)
 	app.Commands = append(app.Commands, cmd)
 }
 
@@ -158,11 +157,6 @@ func pollREST(ctx context.Context, reqID string) (*msg.QueryResult, string, erro
 
 func pollGRPC(ctx context.Context, reqID string) (*msg.QueryResult, string, error) {
 	req := msg.QueryPollRequest{RequestId: reqID}
-	if forceTrace {
-		ctx = metadata.NewOutgoingContext(ctx, metadata.Pairs(
-			"jaeger-debug-id", zvelo.RandString(32),
-		))
-	}
 	var header metadata.MD
 	result, err := grpcClient.QueryContentResultV1(ctx, &req, grpc.Header(&header))
 	var traceID string
