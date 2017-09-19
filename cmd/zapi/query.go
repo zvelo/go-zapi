@@ -23,6 +23,7 @@ import (
 var (
 	queryReq    msg.QueryURLRequests
 	queryListen string
+	queryPoll   bool
 
 	queryCh = make(chan *msg.QueryResult)
 )
@@ -58,7 +59,7 @@ func init() {
 				Name:        "poll",
 				EnvVar:      "ZVELO_QUERY_POLL",
 				Usage:       "poll for resutls",
-				Destination: &queryReq.Poll,
+				Destination: &queryPoll,
 			},
 		},
 	}
@@ -67,7 +68,7 @@ func init() {
 }
 
 func setupQuery(c *cli.Context) error {
-	if queryReq.Poll && queryReq.Callback != "" {
+	if queryPoll && queryReq.Callback != "" {
 		return errors.New("poll and callback can't both be enabled")
 	}
 
@@ -219,7 +220,7 @@ func queryWait(ctx context.Context, traceID string, replies []*msg.QueryReply) e
 		return queryWaitCallback(ctx)
 	}
 
-	if queryReq.Poll {
+	if queryPoll {
 		return pollReqIDs(ctx, reqIDs)
 	}
 

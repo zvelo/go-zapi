@@ -37,6 +37,7 @@ var (
 	scopes                 cli.StringSlice
 	datasetStrings         cli.StringSlice
 	clientID, clientSecret string
+	accessToken            string
 	redirectURL            string
 	callbackAddr           string
 	noOpenBrowser          bool
@@ -83,6 +84,12 @@ func init() {
 			EnvVar:      "ZVELO_CLIENT_SECRET",
 			Usage:       "oauth2 client secret",
 			Destination: &clientSecret,
+		},
+		cli.StringFlag{
+			Name:        "access-token",
+			EnvVar:      "ZVELO_ACCESS_TOKEN",
+			Usage:       "explicitly provide an access token. this should rarely be used as it will override client-id, client-secret and user-credentials",
+			Destination: &accessToken,
 		},
 		cli.BoolFlag{
 			Name:        "use-user-credentials",
@@ -164,14 +171,18 @@ func main() {
 	}
 }
 
-func globalSetup(_ *cli.Context) error {
+func setupTokenSource() {
 	if len(scopes) == 0 {
 		scopes = defaultScopes
 	}
 
 	var cacheName string
 
-	if useUserCredentials {
+	if accessToken != "" {
+		tokenSource = oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: accessToken,
+		})
+	} else if useUserCredentials {
 		cacheName = "user"
 		userOpts := []userauth.Option{
 			userauth.WithRedirectURL(redirectURL),
@@ -198,34 +209,32 @@ func globalSetup(_ *cli.Context) error {
 		)
 	}
 
-	zapiOpts = append(zapiOpts, zapi.WithHost(host))
+	if accessToken == "" {
+		if !noCacheToken {
+			tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
+		}
 
-	if !noCacheToken {
-		tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
+		tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
 	}
 
-	tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
+	if debug {
+		tokenSource = tokensource.Log(tokenSource)
+	}
+}
+
+func setupZapiOpts() {
+	zapiOpts = append(zapiOpts, zapi.WithHost(host))
 
 	if debug {
 		zapiOpts = append(zapiOpts, zapi.WithDebug())
-		tokenSource = tokensource.Log(tokenSource)
 	}
 
 	if forceTrace {
 		zapiOpts = append(zapiOpts, zapi.WithForceTrace())
 	}
+}
 
-	restClient = zapi.NewREST(tokenSource, zapiOpts...)
-
-	grpcDialer := zapi.NewGRPC(tokenSource, zapiOpts...)
-
-	var err error
-
-	grpcClient, err = grpcDialer.Dial(context.Background())
-	if err != nil {
-		return err
-	}
-
+func setupDataSets() error {
 	if len(datasetStrings) == 0 {
 		datasetStrings = defaultDatasets
 	}
@@ -247,6 +256,21 @@ func globalSetup(_ *cli.Context) error {
 	}
 
 	return nil
+}
+
+func globalSetup(_ *cli.Context) error {
+	setupTokenSource()
+	setupZapiOpts()
+
+	restClient = zapi.NewREST(tokenSource, zapiOpts...)
+	grpcDialer := zapi.NewGRPC(tokenSource, zapiOpts...)
+
+	var err error
+	if grpcClient, err = grpcDialer.Dial(context.Background()); err != nil {
+		return err
+	}
+
+	return setupDataSets()
 }
 
 func availableDS() []string {
