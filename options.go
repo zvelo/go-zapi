@@ -2,32 +2,35 @@ package zapi
 
 import (
 	"context"
+	"crypto/tls"
 	"net/http"
-
-	"google.golang.org/grpc/metadata"
-	"zvelo.io/go-zapi/internal/zvelo"
 
 	opentracing "github.com/opentracing/opentracing-go"
 
 	"golang.org/x/oauth2"
+
+	"google.golang.org/grpc/metadata"
+
+	"zvelo.io/go-zapi/internal/zvelo"
 )
 
 // UserAgent is the user agent that will be provided by the RESTClient. It can
 // be overridden by providing a custom transport using the WithTransport Option.
 const UserAgent = "go-zapi v1"
 
-// DefaultHost is used by both GRPCClient and RESTClient as the default
-// host for all zveloAPI calls. It can be overridden using the WithHost
+// DefaultAddr is used by both GRPCClient and RESTClient as the default
+// address:port for all zveloAPI calls. It can be overridden using the WithAddr
 // Option.
-const DefaultHost = "api.zvelo.com"
+const DefaultAddr = "api.zvelo.com"
 
 type options struct {
 	oauth2.TokenSource
-	host       string
-	debug      bool
-	transport  http.RoundTripper
-	tracer     func() opentracing.Tracer
-	forceTrace bool
+	addr                  string
+	debug                 bool
+	transport             http.RoundTripper
+	tracer                func() opentracing.Tracer
+	forceTrace            bool
+	tlsInsecureSkipVerify bool
 }
 
 // An Option is used to configure different parts of this package. Not every
@@ -37,7 +40,7 @@ type Option func(*options)
 func defaults(ts oauth2.TokenSource) *options {
 	return &options{
 		TokenSource: ts,
-		host:        DefaultHost,
+		addr:        DefaultAddr,
 		transport:   http.DefaultTransport,
 		tracer:      opentracing.GlobalTracer,
 	}
@@ -75,6 +78,23 @@ func WithTransport(val http.RoundTripper) Option {
 
 	return func(o *options) {
 		o.transport = val
+		if o.tlsInsecureSkipVerify {
+			WithTLSInsecureSkipVerify()(o)
+		}
+	}
+}
+
+// WithTLSInsecureSkipVerify returns an Option that disables certificate chain
+// and host name verification of the connection to zveloAPI. This should
+// only be used for testing, e.g. with mocks.
+func WithTLSInsecureSkipVerify() Option {
+	return func(o *options) {
+		o.tlsInsecureSkipVerify = true
+		if t, ok := o.transport.(*http.Transport); ok {
+			t.TLSClientConfig = &tls.Config{
+				InsecureSkipVerify: true,
+			}
+		}
 	}
 }
 
@@ -101,14 +121,14 @@ func WithDebug() Option {
 	}
 }
 
-// WithHost returns an Option that overrides the default host for all
+// WithAddr returns an Option that overrides the default address:port for all
 // zveloAPI requests
-func WithHost(val string) Option {
+func WithAddr(val string) Option {
 	if val == "" {
-		val = DefaultHost
+		val = DefaultAddr
 	}
 
 	return func(o *options) {
-		o.host = val
+		o.addr = val
 	}
 }

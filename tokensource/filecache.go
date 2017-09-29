@@ -16,6 +16,11 @@ type fileCache struct {
 	fileName string
 }
 
+type fileToken struct {
+	*oauth2.Token `json:"token"`
+	IDToken       string `json:"id_token"`
+}
+
 // FileCache returns an oauth2.TokenSource that will cache tokens in the
 // filesystem. On unix systems this will be in $XDG_DATA_HOME/<app> (or
 // ~/.local/share/<app>). On windows systems this will be in
@@ -55,9 +60,14 @@ func (s fileCache) Token() (*oauth2.Token, error) {
 	if f, err := os.Open(s.fileName); err == nil {
 		defer func() { _ = f.Close() }()
 
-		var token oauth2.Token
+		var token fileToken
 		if err = json.NewDecoder(f).Decode(&token); err == nil && token.Valid() {
-			return &token, nil
+			if token.IDToken != "" {
+				return token.WithExtra(map[string]interface{}{
+					"id_token": token.IDToken,
+				}), nil
+			}
+			return token.Token, nil
 		}
 	}
 
@@ -81,7 +91,14 @@ func (s fileCache) Token() (*oauth2.Token, error) {
 
 	defer func() { _ = f.Close() }()
 
-	if err = json.NewEncoder(f).Encode(token); err != nil {
+	ft := fileToken{Token: token}
+	if extra := token.Extra("id_token"); extra != nil {
+		if idToken, ok := extra.(string); ok {
+			ft.IDToken = idToken
+		}
+	}
+
+	if err = json.NewEncoder(f).Encode(ft); err != nil {
 		return nil, err
 	}
 

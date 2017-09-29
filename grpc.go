@@ -2,6 +2,7 @@ package zapi
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"net"
 	"net/url"
@@ -65,24 +66,32 @@ func grpcTarget(val string) (string, error) {
 }
 
 func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClient, error) {
-	target, err := grpcTarget(d.options.host)
+	target, err := grpcTarget(d.options.addr)
 	if err != nil {
 		return nil, err
 	}
 
-	conn, err := grpc.DialContext(
-		ctx,
-		target,
-		append([]grpc.DialOption{
-			grpc.WithTransportCredentials(credentials.NewTLS(nil)),
+	var tc tls.Config
+	if d.options.tlsInsecureSkipVerify {
+		tc.InsecureSkipVerify = true
+	}
+
+	dialOpts := append([]grpc.DialOption{
+		grpc.WithTransportCredentials(credentials.NewTLS(&tc)),
+		grpc.WithUnaryInterceptor(
+			otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
+		),
+	}, opts...)
+
+	if d.options.TokenSource != nil {
+		dialOpts = append(dialOpts,
 			grpc.WithPerRPCCredentials(oauth.TokenSource{
 				TokenSource: d.options,
 			}),
-			grpc.WithUnaryInterceptor(
-				otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
-			),
-		}, opts...)...,
-	)
+		)
+	}
+
+	conn, err := grpc.DialContext(ctx, target, dialOpts...)
 
 	if err != nil {
 		return nil, err
@@ -105,22 +114,12 @@ func NewGRPC(ts oauth2.TokenSource, opts ...Option) GRPCDialer {
 	return grpcDialer{options: o}
 }
 
-func (c grpcClient) QueryURLV1(ctx context.Context, in *msg.QueryURLRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
+func (c grpcClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
 	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryURLV1(ctx, in, opts...)
+	return c.client.QueryV1(ctx, in, opts...)
 }
 
-func (c grpcClient) QueryURLResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...grpc.CallOption) (*msg.QueryResult, error) {
+func (c grpcClient) QueryResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...grpc.CallOption) (*msg.QueryResult, error) {
 	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryContentResultV1(ctx, in, opts...)
-}
-
-func (c grpcClient) QueryContentV1(ctx context.Context, in *msg.QueryContentRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
-	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryContentV1(ctx, in, opts...)
-}
-
-func (c grpcClient) QueryContentResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...grpc.CallOption) (*msg.QueryResult, error) {
-	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryContentResultV1(ctx, in, opts...)
+	return c.client.QueryResultV1(ctx, in, opts...)
 }

@@ -49,18 +49,20 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ext.HTTPMethod.Set(clientSpan, req.Method)
 	ext.HTTPUrl.Set(clientSpan, req.URL.String())
 
-	token, err := t.Token()
-	if err != nil {
-		clientSpan.LogFields(
-			log.String("event", "TokenSource.Token() failed"),
-			log.Error(err),
-		)
-		return nil, err
+	if t.TokenSource != nil {
+		token, err := t.Token()
+		if err != nil {
+			clientSpan.LogFields(
+				log.String("event", "TokenSource.Token() failed"),
+				log.Error(err),
+			)
+			return nil, err
+		}
+
+		token.SetAuthHeader(req)
 	}
 
-	token.SetAuthHeader(req)
-
-	err = t.tracer().Inject(
+	err := t.tracer().Inject(
 		clientSpan.Context(),
 		opentracing.HTTPHeaders,
 		opentracing.HTTPHeadersCarrier(req.Header),

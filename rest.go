@@ -16,12 +16,9 @@ import (
 	"zvelo.io/msg"
 )
 
-const (
-	queryURLV1Path     = "/v1/queries/url"
-	queryContentV1Path = "/v1/queries/content"
-)
+const queryV1Path = "/v1/query"
 
-func restURL(base, dir string) (string, error) {
+func restURL(base, dir string, elem ...string) (string, error) {
 	if !strings.Contains(base, "://") {
 		base = "https://" + base
 	}
@@ -31,7 +28,11 @@ func restURL(base, dir string) (string, error) {
 		return "", err
 	}
 
-	p.Path = path.Join(p.Path, dir)
+	parts := []string{p.Path, dir}
+
+	parts = append(parts, elem...)
+
+	p.Path = path.Join(parts...)
 
 	return p.String(), nil
 }
@@ -65,10 +66,8 @@ func Response(h **http.Response) CallOption {
 // standard HTTP/REST transport instead of gRPC. Generally the gRPC client is
 // preferred for its efficiency.
 type RESTClient interface {
-	QueryURLV1(context.Context, *msg.QueryURLRequests, ...CallOption) (*msg.QueryReplies, error)
-	QueryURLResultV1(context.Context, *msg.QueryPollRequest, ...CallOption) (*msg.QueryResult, error)
-	QueryContentV1(context.Context, *msg.QueryContentRequests, ...CallOption) (*msg.QueryReplies, error)
-	QueryContentResultV1(context.Context, *msg.QueryPollRequest, ...CallOption) (*msg.QueryResult, error)
+	QueryV1(ctx context.Context, in *msg.QueryRequests, opt ...CallOption) (*msg.QueryReplies, error)
+	QueryResultV1(ctx context.Context, reqID string, opt ...CallOption) (*msg.QueryResult, error)
 }
 
 // NewREST returns a properly configured RESTClient
@@ -88,8 +87,8 @@ func (c *restClient) do(ctx context.Context, req *http.Request) (*http.Response,
 	return c.client.Do(req.WithContext(ctx))
 }
 
-func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, opts ...CallOption) (*msg.QueryReplies, error) {
-	url, err := restURL(c.options.host, path)
+func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
+	url, err := restURL(c.options.addr, queryV1Path)
 	if err != nil {
 		return nil, err
 	}
@@ -128,8 +127,8 @@ func (c *restClient) queryV1(ctx context.Context, path string, in interface{}, o
 	return &replies, nil
 }
 
-func (c *restClient) queryResultV1(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
-	url, err := restURL(c.options.host, path.Join(queryURLV1Path, reqID))
+func (c *restClient) QueryResultV1(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
+	url, err := restURL(c.options.addr, queryV1Path, reqID)
 	if err != nil {
 		return nil, err
 	}
@@ -159,20 +158,4 @@ func (c *restClient) queryResultV1(ctx context.Context, reqID string, opts ...Ca
 	}
 
 	return &result, nil
-}
-
-func (c *restClient) QueryURLV1(ctx context.Context, in *msg.QueryURLRequests, opts ...CallOption) (*msg.QueryReplies, error) {
-	return c.queryV1(ctx, queryURLV1Path, in, opts...)
-}
-
-func (c *restClient) QueryContentV1(ctx context.Context, in *msg.QueryContentRequests, opts ...CallOption) (*msg.QueryReplies, error) {
-	return c.queryV1(ctx, queryContentV1Path, in, opts...)
-}
-
-func (c *restClient) QueryURLResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...CallOption) (*msg.QueryResult, error) {
-	return c.queryResultV1(ctx, in.RequestId, opts...)
-}
-
-func (c *restClient) QueryContentResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...CallOption) (*msg.QueryResult, error) {
-	return c.queryResultV1(ctx, in.RequestId, opts...)
 }

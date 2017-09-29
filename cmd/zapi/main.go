@@ -22,7 +22,7 @@ import (
 const name = "zapi"
 
 var (
-	host                   string
+	addr                   string
 	debug, rest            bool
 	restClient             zapi.RESTClient
 	grpcClient             zapi.GRPCClient
@@ -41,6 +41,8 @@ var (
 	redirectURL            string
 	callbackAddr           string
 	noOpenBrowser          bool
+	tlsInsecureSkipVerify  bool
+	mockNoCredentials      bool
 
 	version         = "1.0.0"
 	app             = cli.NewApp()
@@ -61,11 +63,16 @@ func init() {
 
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
-			Name:        "host",
-			EnvVar:      "ZVELO_HOST",
-			Usage:       "hostname of the API endpoint",
-			Value:       zapi.DefaultHost,
-			Destination: &host,
+			Name:        "addr",
+			EnvVar:      "ZVELO_ADDR",
+			Usage:       "address:port of the API endpoint",
+			Value:       zapi.DefaultAddr,
+			Destination: &addr,
+		},
+		cli.BoolFlag{
+			Name:        "tls-insecure-skip-verify",
+			Usage:       "disable certificate chain and host name verification of the connection to zveloAPI. this should only be used for testing, e.g. with mocks.",
+			Destination: &tlsInsecureSkipVerify,
 		},
 		cli.BoolFlag{
 			Name:        "debug",
@@ -90,6 +97,11 @@ func init() {
 			EnvVar:      "ZVELO_ACCESS_TOKEN",
 			Usage:       "explicitly provide an access token. this should rarely be used as it will override client-id, client-secret and user-credentials",
 			Destination: &accessToken,
+		},
+		cli.BoolFlag{
+			Name:        "mock-no-credentials",
+			Usage:       "when querying against the mock server, which does not require credentials, do not attempt to get a token",
+			Destination: &mockNoCredentials,
 		},
 		cli.BoolFlag{
 			Name:        "use-user-credentials",
@@ -178,7 +190,9 @@ func setupTokenSource() {
 
 	var cacheName string
 
-	if accessToken != "" {
+	if mockNoCredentials {
+		// noop, don't set tokenSource
+	} else if accessToken != "" {
 		tokenSource = oauth2.StaticTokenSource(&oauth2.Token{
 			AccessToken: accessToken,
 		})
@@ -209,21 +223,23 @@ func setupTokenSource() {
 		)
 	}
 
-	if accessToken == "" {
-		if !noCacheToken {
-			tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
+	if tokenSource != nil {
+		if accessToken == "" {
+			if !noCacheToken {
+				tokenSource = tokensource.FileCache(tokenSource, "zapi", cacheName, scopes...)
+			}
+
+			tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
 		}
 
-		tokenSource = oauth2.ReuseTokenSource(nil, tokenSource)
-	}
-
-	if debug {
-		tokenSource = tokensource.Log(tokenSource)
+		if debug {
+			tokenSource = tokensource.Log(tokenSource)
+		}
 	}
 }
 
 func setupZapiOpts() {
-	zapiOpts = append(zapiOpts, zapi.WithHost(host))
+	zapiOpts = append(zapiOpts, zapi.WithAddr(addr))
 
 	if debug {
 		zapiOpts = append(zapiOpts, zapi.WithDebug())
@@ -231,6 +247,10 @@ func setupZapiOpts() {
 
 	if forceTrace {
 		zapiOpts = append(zapiOpts, zapi.WithForceTrace())
+	}
+
+	if tlsInsecureSkipVerify {
+		zapiOpts = append(zapiOpts, zapi.WithTLSInsecureSkipVerify())
 	}
 }
 
