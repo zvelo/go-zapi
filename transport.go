@@ -78,9 +78,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		req.Header.Set("jaeger-debug-id", zvelo.RandString(32))
 	}
 
-	if t.debug {
-		zvelo.DebugRequestOut(req)
-	}
+	zvelo.DebugRequestOut(t.debug, req)
 
 	res, err := t.transport.RoundTrip(req)
 	if err != nil {
@@ -91,9 +89,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	if t.debug {
-		zvelo.DebugResponse(res)
-	}
+	zvelo.DebugResponse(t.debug, res)
 
 	ext.HTTPStatusCode.Set(clientSpan, uint16(res.StatusCode))
 

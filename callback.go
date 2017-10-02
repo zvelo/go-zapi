@@ -34,9 +34,7 @@ func CallbackHandler(h Handler, opts ...Option) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if o.debug {
-			zvelo.DebugRequest(r)
-		}
+		zvelo.DebugRequest(o.debug, r)
 
 		var result msg.QueryResult
 		if err := json.NewDecoder(r.Body).Decode(&result); err == nil {

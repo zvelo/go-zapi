@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"html/template"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -40,10 +42,11 @@ var tokenHTMLTpl = template.Must(template.New("token").Parse(tokenHTMLTplStr))
 type userAccreditor struct {
 	sync.Mutex
 	oauth2.Config
-	addr  string
-	open  bool
-	ctx   context.Context
-	debug bool
+	addr    string
+	open    bool
+	urlFunc func(string)
+	ctx     context.Context
+	debug   io.Writer
 }
 
 var _ oauth2.TokenSource = (*userAccreditor)(nil)
@@ -73,6 +76,28 @@ func WithRedirectURL(val string) Option {
 
 	return func(a *userAccreditor) {
 		a.Config.RedirectURL = val
+	}
+}
+
+// WithEndpoint returns an Option that specifies the oauth2 endpoint that will
+// be used to get tokens. By default it uses zapi.Endpoint.
+func WithEndpoint(val oauth2.Endpoint) Option {
+	if val == (oauth2.Endpoint{}) {
+		val = zapi.Endpoint
+	}
+
+	return func(a *userAccreditor) {
+		a.Config.Endpoint = val
+	}
+}
+
+// WithURLFunc returns an Option that will cause the passed in func to be called
+// in a new goroutine with the value of the URL that should be opened. This
+// allows programmatic user authentication (e.g. without interacting with the
+// browser). Overrides WithoutOpen().
+func WithURLFunc(val func(string)) Option {
+	return func(a *userAccreditor) {
+		a.urlFunc = val
 	}
 }
 
@@ -111,10 +136,14 @@ func WithoutOpen() Option {
 }
 
 // WithDebug returns an option that causes incoming http.Requests to the
-// callback server to be logged to stderr.
-func WithDebug() Option {
+// callback server to be logged to the writer.
+func WithDebug(val io.Writer) Option {
+	if val == nil {
+		val = ioutil.Discard
+	}
+
 	return func(a *userAccreditor) {
-		a.debug = true
+		a.debug = val
 	}
 }
 
@@ -127,9 +156,10 @@ func defaults(ctx context.Context, clientID, clientSecret string) *userAccredito
 			RedirectURL:  DefaultRedirectURL,
 			Scopes:       defaultScopes(),
 		},
-		addr: DefaultCallbackAddr,
-		ctx:  ctx,
-		open: true,
+		addr:  DefaultCallbackAddr,
+		ctx:   ctx,
+		open:  true,
+		debug: ioutil.Discard,
 	}
 }
 
@@ -151,7 +181,9 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 
 	u := a.AuthCodeURL(state)
 
-	if a.open {
+	if a.urlFunc != nil {
+		go a.urlFunc(u)
+	} else if a.open {
 		fmt.Fprintf(os.Stderr, "opening in browser: %s\n", u)
 		if err := browser.OpenURL(u); err != nil {
 			return nil, err
@@ -160,13 +192,10 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 		fmt.Fprintf(os.Stderr, "open this url in your browser: %s\n", u)
 	}
 
-	ctx, cancel := context.WithCancel(a.ctx)
-	defer cancel()
-
 	ch := make(chan result)
 
 	mux := http.NewServeMux()
-	mux.Handle("/", a.handler(ctx, state, ch))
+	mux.Handle("/", a.handler(state, ch))
 
 	server := http.Server{
 		Addr:    a.addr,
@@ -179,13 +208,12 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 		}
 	}()
 
-	defer func() { _ = server.Shutdown(ctx) }()
+	defer func() { _ = server.Shutdown(a.ctx) }()
 
 	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
+	case <-a.ctx.Done():
+		return nil, a.ctx.Err()
 	case res := <-ch:
-		cancel()
 		return res.token, res.err
 	}
 }
@@ -195,11 +223,9 @@ type result struct {
 	err   error
 }
 
-func (a *userAccreditor) handler(ctx context.Context, state string, ch chan<- result) http.Handler {
+func (a *userAccreditor) handler(state string, ch chan<- result) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if a.debug {
-			zvelo.DebugRequest(r)
-		}
+		zvelo.DebugRequest(a.debug, r)
 
 		if state == "" || state != r.URL.Query().Get("state") {
 			// don't return the result on the channel, this can happen when the
@@ -232,7 +258,7 @@ func (a *userAccreditor) handler(ctx context.Context, state string, ch chan<- re
 			return
 		}
 
-		res.token, res.err = a.Exchange(ctx, r.URL.Query().Get("code"))
+		res.token, res.err = a.Exchange(a.ctx, r.URL.Query().Get("code"))
 		if res.err != nil {
 			http.Error(w, res.err.Error(), http.StatusBadRequest)
 			return

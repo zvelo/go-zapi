@@ -3,6 +3,8 @@ package zapi
 import (
 	"context"
 	"crypto/tls"
+	"io"
+	"io/ioutil"
 	"net/http"
 
 	opentracing "github.com/opentracing/opentracing-go"
@@ -26,7 +28,7 @@ const DefaultAddr = "api.zvelo.com"
 type options struct {
 	oauth2.TokenSource
 	addr                  string
-	debug                 bool
+	debug                 io.Writer
 	transport             http.RoundTripper
 	tracer                func() opentracing.Tracer
 	forceTrace            bool
@@ -43,6 +45,7 @@ func defaults(ts oauth2.TokenSource) *options {
 		addr:        DefaultAddr,
 		transport:   http.DefaultTransport,
 		tracer:      opentracing.GlobalTracer,
+		debug:       ioutil.Discard,
 	}
 }
 
@@ -114,10 +117,14 @@ func WithTracer(val opentracing.Tracer) Option {
 }
 
 // WithDebug returns an Option that will cause requests from the RESTClient and
-// callbacks processed by the CallbackHandler to emit debug logs to stderr
-func WithDebug() Option {
+// callbacks processed by the CallbackHandler to emit debug logs to the writer
+func WithDebug(val io.Writer) Option {
+	if val == nil {
+		val = ioutil.Discard
+	}
+
 	return func(o *options) {
-		o.debug = true
+		o.debug = val
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httputil"
-	"os"
 	"strings"
 
 	"github.com/fatih/color"
@@ -22,28 +21,28 @@ func printDump(w io.Writer, dump []byte, attr color.Attribute, prefix string) {
 }
 
 // DebugRequest logs incoming http.Requests to stderr
-func DebugRequest(req *http.Request) {
-	debugHTTP(color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
+func DebugRequest(w io.Writer, req *http.Request) {
+	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
 }
 
 // DebugRequestOut logs outgoing http.Requests to stderr
-func DebugRequestOut(req *http.Request) {
-	debugHTTP(color.FgGreen, "> ", func() ([]byte, error) { return httputil.DumpRequestOut(req, true) })
+func DebugRequestOut(w io.Writer, req *http.Request) {
+	debugHTTP(w, color.FgGreen, "> ", func() ([]byte, error) { return httputil.DumpRequestOut(req, true) })
 }
 
 // DebugResponse logs received http.Responses to stderr
-func DebugResponse(resp *http.Response) {
-	debugHTTP(color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, true) })
+func DebugResponse(w io.Writer, resp *http.Response) {
+	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, true) })
 }
 
-func debugHTTP(attr color.Attribute, prefix string, fn func() ([]byte, error)) {
+func debugHTTP(w io.Writer, attr color.Attribute, prefix string, fn func() ([]byte, error)) {
 	dump, err := fn()
 	if err != nil {
-		_, _ = color.New(color.FgRed).Fprintf(os.Stderr, "%s\n", err)
+		_, _ = color.New(color.FgRed).Fprintf(w, "%s\n", err)
 		return
 	}
 
-	printDump(os.Stderr, dump, attr, prefix)
+	printDump(w, dump, attr, prefix)
 }
 
 var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
