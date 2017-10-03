@@ -25,13 +25,19 @@ func TestRest(t *testing.T) {
 		t.Fatal("unexpected replies")
 	}
 
-	result, err := client.QueryResultV1(ctx, replies.Reply[0].RequestId)
+	reqID := replies.Reply[0].RequestId
+
+	if reqID == "" {
+		t.Error("empty request_id")
+	}
+
+	result, err := client.QueryResultV1(ctx, reqID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(result, queryExpect) {
-		t.Log(cmp.Diff(result, queryExpect))
+	if !cmp.Equal(result, queryExpect(reqID)) {
+		t.Log(cmp.Diff(result, queryExpect(reqID)))
 		t.Error("got unexpected result")
 	}
 }

@@ -22,7 +22,6 @@ var (
 	opts         []Option
 	queryURL     string
 	queryRequest *msg.QueryRequests
-	queryExpect  *msg.QueryResult
 )
 
 type TestTokenSource struct {
@@ -94,8 +93,11 @@ func init() {
 			uint32(msg.ECHO),
 		},
 	}
+}
 
-	queryExpect = &msg.QueryResult{
+func queryExpect(reqID string) *msg.QueryResult {
+	return &msg.QueryResult{
+		RequestId: reqID,
 		ResponseDataset: &msg.DataSet{
 			Categorization: &msg.DataSet_Categorization{
 				Value: []uint32{
@@ -132,15 +134,21 @@ func TestGRPC(t *testing.T) {
 		t.Fatal("unexpected replies")
 	}
 
+	reqID := replies.Reply[0].RequestId
+
+	if reqID == "" {
+		t.Error("empty request_id")
+	}
+
 	result, err := client.QueryResultV1(ctx, &msg.QueryPollRequest{
-		RequestId: replies.Reply[0].RequestId,
+		RequestId: reqID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(result, queryExpect) {
-		t.Log(cmp.Diff(result, queryExpect))
+	if !cmp.Equal(result, queryExpect(reqID)) {
+		t.Log(cmp.Diff(result, queryExpect(reqID)))
 		t.Error("got unexpected result")
 	}
 
