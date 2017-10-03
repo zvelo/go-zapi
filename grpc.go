@@ -4,10 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"io"
-	"net"
-	"net/url"
-	"strconv"
-	"strings"
 
 	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 
@@ -43,34 +39,7 @@ type grpcDialer struct {
 	options *options
 }
 
-func grpcTarget(val string) (string, error) {
-	if !strings.Contains(val, "://") {
-		val = "https://" + val
-	}
-
-	p, err := url.Parse(val)
-	if err != nil {
-		return "", err
-	}
-
-	port := p.Port()
-	if port == "" {
-		o, err := net.LookupPort("tcp", p.Scheme)
-		if err != nil {
-			return "", err
-		}
-		port = strconv.Itoa(o)
-	}
-
-	return net.JoinHostPort(p.Hostname(), port), nil
-}
-
 func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClient, error) {
-	target, err := grpcTarget(d.options.addr)
-	if err != nil {
-		return nil, err
-	}
-
 	var tc tls.Config
 	if d.options.tlsInsecureSkipVerify {
 		tc.InsecureSkipVerify = true
@@ -91,8 +60,7 @@ func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClie
 		)
 	}
 
-	conn, err := grpc.DialContext(ctx, target, dialOpts...)
-
+	conn, err := grpc.DialContext(ctx, d.options.grpcTarget, dialOpts...)
 	if err != nil {
 		return nil, err
 	}

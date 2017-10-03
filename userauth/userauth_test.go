@@ -2,102 +2,81 @@ package userauth
 
 import (
 	"context"
-	"encoding/json"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strconv"
-	"sync"
 	"testing"
-	"time"
+
+	"github.com/pkg/errors"
 
 	"golang.org/x/oauth2"
 
 	"zvelo.io/go-zapi/internal/zvelo"
 )
 
-type mockOAuth2 struct {
-	reqs sync.Map
-}
-
-func NewMockOAuth2() http.Handler {
-	m := mockOAuth2{}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("/oauth2/auth", m.authHandler)
-	mux.HandleFunc("/oauth2/token", m.tokenHandler)
-
-	return mux
-}
-
-func (m *mockOAuth2) authHandler(w http.ResponseWriter, r *http.Request) {
-	redirectURI := r.URL.Query().Get("redirect_uri")
-	p, err := url.Parse(redirectURI)
+func ensureCode(u string, code int) {
+	resp, err := http.Get(u)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
-	code := zvelo.RandString(32)
-	m.reqs.Store(code, struct{}{})
-
-	values := p.Query()
-	values.Set("code", code)
-	values.Set("state", r.URL.Query().Get("state"))
-	p.RawQuery = values.Encode()
-
-	resp, err := http.Get(p.String())
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("unexpected response code %s(%d)", http.StatusText(resp.StatusCode), resp.StatusCode)
-	}
-}
-
-type expirationTime time.Duration
-
-func (e expirationTime) MarshalJSON() ([]byte, error) {
-	return []byte(strconv.FormatInt(int64(time.Duration(e).Seconds()), 10)), nil
-}
-
-type tokenJSON struct {
-	AccessToken  string         `json:"access_token"`
-	TokenType    string         `json:"token_type"`
-	RefreshToken string         `json:"refresh_token"`
-	ExpiresIn    expirationTime `json:"expires_in"`
-}
-
-func (m *mockOAuth2) tokenHandler(w http.ResponseWriter, r *http.Request) {
-	code := r.FormValue("code")
-	if _, ok := m.reqs.Load(code); !ok {
-		log.Fatal("unexpceted code")
-	}
-	m.reqs.Delete(code)
-	w.Header().Set("Content-Type", "application/json")
-
-	err := json.NewEncoder(w).Encode(tokenJSON{
-		AccessToken: zvelo.RandString(32),
-		TokenType:   "Bearer",
-		ExpiresIn:   expirationTime(time.Hour),
-	})
-	if err != nil {
-		log.Fatal(err)
+	if resp.StatusCode != code {
+		panic(errors.Errorf("unexpected status code for %s (%d != %d)", u, resp.StatusCode, code))
 	}
 }
 
 func testURLHandler(u string) {
-	resp, err := http.Get(u)
+	p, err := url.Parse(u)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		log.Fatalf("unexpected response code %s(%d)", http.StatusText(resp.StatusCode), resp.StatusCode)
+	state := p.Query().Get("state")
+	redirectURI := p.Query().Get("redirect_uri")
+	if p, err = url.Parse(redirectURI); err != nil {
+		panic(err)
+	}
+
+	// test access_denied
+
+	query := p.Query()
+	query.Set("error", "access_denied")
+	query.Set("error_description", "some error")
+	query.Set("state", state)
+	p.RawQuery = query.Encode()
+
+	ensureCode(p.String(), http.StatusUnauthorized)
+
+	// test invalid_request
+
+	query.Set("error", "invalid_request")
+	p.RawQuery = query.Encode()
+	ensureCode(p.String(), http.StatusBadRequest)
+
+	// test unsupported_response_type
+
+	query.Set("error", "unsupported_response_type")
+	p.RawQuery = query.Encode()
+	ensureCode(p.String(), http.StatusInternalServerError)
+
+	// test server_error
+
+	query.Set("error", "server_error")
+	p.RawQuery = query.Encode()
+	ensureCode(p.String(), http.StatusServiceUnavailable)
+
+	// test favicon
+
+	p.Path = "/favicon.ico"
+	p.RawQuery = ""
+
+	ensureCode(p.String(), http.StatusUnauthorized)
+
+	// finally, just go to the url
+
+	if _, err = http.Get(u); err != nil {
+		panic(err)
 	}
 }
 
@@ -107,18 +86,17 @@ func TestUserAuth(t *testing.T) {
 
 	scopes := []string{"scope0", "scope1"}
 
-	srv := httptest.NewServer(NewMockOAuth2())
+	handler := zvelo.MockOAuth2Handler()
+	srv := httptest.NewServer(handler)
 
 	ts := TokenSource(ctx, clientID, clientSecret,
+		WithIgnoreErrors(),
 		WithCallbackAddr(""),
 		WithCallbackAddr(DefaultCallbackAddr),
 		WithDebug(nil),
 		WithDebug(ioutil.Discard),
 		WithEndpoint(oauth2.Endpoint{}),
-		WithEndpoint(oauth2.Endpoint{
-			AuthURL:  srv.URL + "/oauth2/auth",
-			TokenURL: srv.URL + "/oauth2/token",
-		}),
+		WithEndpoint(handler.Endpoint(srv.URL)),
 		WithRedirectURL(""),
 		WithRedirectURL(DefaultRedirectURL),
 		WithScope(),

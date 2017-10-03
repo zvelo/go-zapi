@@ -5,7 +5,12 @@ import (
 	"crypto/tls"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"net/url"
+	"path"
+	"strconv"
+	"strings"
 
 	opentracing "github.com/opentracing/opentracing-go"
 
@@ -27,10 +32,11 @@ const DefaultAddr = "api.zvelo.com"
 
 type options struct {
 	oauth2.TokenSource
-	addr                  string
+	grpcTarget            string
+	restBaseURL           *url.URL
 	debug                 io.Writer
 	transport             http.RoundTripper
-	tracer                func() opentracing.Tracer
+	tracerFunc            func() opentracing.Tracer
 	forceTrace            bool
 	tlsInsecureSkipVerify bool
 }
@@ -40,13 +46,32 @@ type options struct {
 type Option func(*options)
 
 func defaults(ts oauth2.TokenSource) *options {
-	return &options{
+	o := options{
 		TokenSource: ts,
-		addr:        DefaultAddr,
 		transport:   http.DefaultTransport,
-		tracer:      opentracing.GlobalTracer,
+		tracerFunc:  opentracing.GlobalTracer,
 		debug:       ioutil.Discard,
 	}
+	WithAddr(DefaultAddr)(&o)
+	return &o
+}
+
+func (o options) tracer() opentracing.Tracer {
+	if tracer := o.tracerFunc(); tracer != nil {
+		return tracer
+	}
+
+	return opentracing.NoopTracer{}
+}
+
+func (o options) restURL(dir string, elem ...string) string {
+	u := *o.restBaseURL
+
+	parts := []string{u.Path, dir}
+	parts = append(parts, elem...)
+	u.Path = path.Join(parts...)
+
+	return u.String()
 }
 
 func (o options) NewOutgoingContext(ctx context.Context) context.Context {
@@ -106,11 +131,11 @@ func WithTLSInsecureSkipVerify() Option {
 func WithTracer(val opentracing.Tracer) Option {
 	return func(o *options) {
 		if val == nil {
-			o.tracer = opentracing.GlobalTracer
+			o.tracerFunc = opentracing.GlobalTracer
 			return
 		}
 
-		o.tracer = func() opentracing.Tracer {
+		o.tracerFunc = func() opentracing.Tracer {
 			return val
 		}
 	}
@@ -135,7 +160,26 @@ func WithAddr(val string) Option {
 		val = DefaultAddr
 	}
 
+	if !strings.Contains(val, "://") {
+		val = "https://" + val
+	}
+
+	p, err := url.Parse(val)
+	if err != nil {
+		panic(err)
+	}
+
+	port := p.Port()
+	if port == "" {
+		o, err := net.LookupPort("tcp", p.Scheme)
+		if err != nil {
+			panic(err)
+		}
+		port = strconv.Itoa(o)
+	}
+
 	return func(o *options) {
-		o.addr = val
+		o.grpcTarget = net.JoinHostPort(p.Hostname(), port)
+		o.restBaseURL = p
 	}
 }

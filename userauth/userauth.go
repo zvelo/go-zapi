@@ -47,6 +47,7 @@ type userAccreditor struct {
 	authCodeURLHandler AuthCodeURLHandler
 	ctx                context.Context
 	debug              io.Writer
+	ignoreErrors       bool
 }
 
 var _ oauth2.TokenSource = (*userAccreditor)(nil)
@@ -65,6 +66,15 @@ func defaultScopes() []string {
 
 // An Option is used to configure the oauth2 user credential flow.
 type Option func(*userAccreditor)
+
+// WithIgnoreErrors returns an Option that prevents redirect uris from the
+// server containing errors from stopping the listener server. This should only
+// be used for testing.
+func WithIgnoreErrors() Option {
+	return func(a *userAccreditor) {
+		a.ignoreErrors = true
+	}
+}
 
 // WithRedirectURL returns an Option that specifies the RedirectURL that will be
 // used by the oauth2 flow. The client must be configured on the oauth2 server
@@ -252,27 +262,39 @@ func (a *userAccreditor) handler(state string, ch chan<- result) http.Handler {
 			return
 		}
 
+		var queryErr error
 		var res result
-		defer func() { ch <- res }()
+
+		defer func() {
+			if res.err == nil && queryErr != nil {
+				if a.ignoreErrors {
+					return
+				}
+
+				res.err = queryErr
+			}
+
+			ch <- res
+		}()
 
 		errCode := r.URL.Query().Get("error")
 
 		if errCode != "" {
-			res.err = errors.Errorf("%s: %s", errCode, r.URL.Query().Get("error_description"))
+			queryErr = errors.Errorf("%s: %s", errCode, r.URL.Query().Get("error_description"))
 		}
 
 		switch errCode {
 		case "access_denied", "unauthorized_client":
-			http.Error(w, res.err.Error(), http.StatusUnauthorized)
+			http.Error(w, queryErr.Error(), http.StatusUnauthorized)
 			return
 		case "invalid_request":
-			http.Error(w, res.err.Error(), http.StatusBadRequest)
+			http.Error(w, queryErr.Error(), http.StatusBadRequest)
 			return
 		case "unsupported_response_type", "invalid_scope":
-			http.Error(w, res.err.Error(), http.StatusInternalServerError)
+			http.Error(w, queryErr.Error(), http.StatusInternalServerError)
 			return
 		case "server_error", "temporarily_unavailable":
-			http.Error(w, res.err.Error(), http.StatusServiceUnavailable)
+			http.Error(w, queryErr.Error(), http.StatusServiceUnavailable)
 			return
 		}
 

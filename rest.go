@@ -5,9 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"net/url"
-	"path"
-	"strings"
 
 	"golang.org/x/oauth2"
 
@@ -17,25 +14,6 @@ import (
 )
 
 const queryV1Path = "/v1/query"
-
-func restURL(base, dir string, elem ...string) (string, error) {
-	if !strings.Contains(base, "://") {
-		base = "https://" + base
-	}
-
-	p, err := url.Parse(base)
-	if err != nil {
-		return "", err
-	}
-
-	parts := []string{p.Path, dir}
-
-	parts = append(parts, elem...)
-
-	p.Path = path.Join(parts...)
-
-	return p.String(), nil
-}
 
 type restClient struct {
 	options *options
@@ -83,15 +61,12 @@ func NewREST(ts oauth2.TokenSource, opts ...Option) RESTClient {
 	}
 }
 
-func (c *restClient) do(ctx context.Context, req *http.Request) (*http.Response, error) {
+func (c *restClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return c.client.Do(req.WithContext(ctx))
 }
 
 func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
-	url, err := restURL(c.options.addr, queryV1Path)
-	if err != nil {
-		return nil, err
-	}
+	url := c.options.restURL(queryV1Path)
 
 	data, err := json.Marshal(in)
 	if err != nil {
@@ -105,7 +80,7 @@ func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ..
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.do(ctx, req)
+	resp, err := c.Do(ctx, req)
 	if err != nil {
 		return nil, err
 	}
@@ -128,17 +103,14 @@ func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ..
 }
 
 func (c *restClient) QueryResultV1(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
-	url, err := restURL(c.options.addr, queryV1Path, reqID)
-	if err != nil {
-		return nil, err
-	}
+	url := c.options.restURL(queryV1Path, reqID)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := c.do(ctx, req)
+	resp, err := c.Do(ctx, req)
 	if err != nil {
 		return nil, err
 	}

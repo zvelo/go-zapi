@@ -9,6 +9,8 @@ import (
 
 	"golang.org/x/oauth2"
 
+	"google.golang.org/grpc/metadata"
+
 	"github.com/google/go-cmp/cmp"
 	opentracing "github.com/opentracing/opentracing-go"
 
@@ -16,7 +18,12 @@ import (
 	"zvelo.io/msg/mock"
 )
 
-var opts []Option
+var (
+	opts         []Option
+	queryURL     string
+	queryRequest *msg.QueryRequests
+	queryExpect  *msg.QueryResult
+)
 
 type TestTokenSource struct {
 	token *oauth2.Token
@@ -60,39 +67,68 @@ func init() {
 	opts = []Option{
 		WithForceTrace(),
 		WithTLSInsecureSkipVerify(),
+		WithTransport(http.DefaultTransport),
+		WithTransport(nil),
 		WithTracer(nil),
 		WithTracer(opentracing.GlobalTracer()),
 		WithDebug(ioutil.Discard),
-		WithAddr(DefaultAddr),
+		WithDebug(nil),
+		WithAddr(""),
 		WithAddr(mockAddr),
 	}
-}
 
-func TestGRPC(t *testing.T) {
-	ctx := context.Background()
-	dialer := NewGRPC(TestTokenSource{}, opts...)
-	client, err := dialer.Dial(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	u, err := mock.NewQueryURL("http://example.com",
+	queryURL, err = mock.NewQueryURL("http://example.com",
 		mock.WithCategories(
 			msg.BLOG_4,
 			msg.NEWS_4,
 		),
 	)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 
-	replies, err := client.QueryV1(ctx, &msg.QueryRequests{
-		Url: []string{u},
+	queryRequest = &msg.QueryRequests{
+		Url: []string{queryURL},
 		Dataset: []uint32{
 			uint32(msg.CATEGORIZATION),
 			uint32(msg.ECHO),
 		},
-	})
+	}
+
+	queryExpect = &msg.QueryResult{
+		Url: queryURL,
+		ResponseDataset: &msg.DataSet{
+			Categorization: &msg.DataSet_Categorization{
+				Value: []uint32{
+					uint32(msg.BLOG_4),
+					uint32(msg.NEWS_4),
+				},
+			},
+			Echo: &msg.DataSet_Echo{
+				Url: queryURL,
+			},
+		},
+		RequestDataset: []uint32{
+			uint32(msg.CATEGORIZATION),
+			uint32(msg.ECHO),
+		},
+		QueryStatus: &msg.QueryStatus{
+			Complete:  true,
+			FetchCode: http.StatusOK,
+		},
+	}
+}
+
+func TestGRPC(t *testing.T) {
+	ctx := metadata.NewOutgoingContext(context.Background(), nil)
+
+	dialer := NewGRPC(TestTokenSource{}, opts...)
+	client, err := dialer.Dial(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	replies, err := client.QueryV1(ctx, queryRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,31 +144,8 @@ func TestGRPC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expect := &msg.QueryResult{
-		Url: u,
-		ResponseDataset: &msg.DataSet{
-			Categorization: &msg.DataSet_Categorization{
-				Value: []uint32{
-					uint32(msg.BLOG_4),
-					uint32(msg.NEWS_4),
-				},
-			},
-			Echo: &msg.DataSet_Echo{
-				Url: u,
-			},
-		},
-		RequestDataset: []uint32{
-			uint32(msg.CATEGORIZATION),
-			uint32(msg.ECHO),
-		},
-		QueryStatus: &msg.QueryStatus{
-			Complete:  true,
-			FetchCode: http.StatusOK,
-		},
-	}
-
-	if !cmp.Equal(result, expect) {
-		t.Log(cmp.Diff(result, expect))
+	if !cmp.Equal(result, queryExpect) {
+		t.Log(cmp.Diff(result, queryExpect))
 		t.Error("got unexpected result")
 	}
 
