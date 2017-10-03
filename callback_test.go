@@ -33,10 +33,6 @@ func TestCallbackHandler(t *testing.T) {
 				},
 			},
 		},
-		Url: "test_url",
-		RequestDataset: []uint32{
-			uint32(msg.CATEGORIZATION),
-		},
 		QueryStatus: &msg.QueryStatus{
 			Complete:  true,
 			FetchCode: http.StatusOK,

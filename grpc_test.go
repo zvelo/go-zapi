@@ -96,7 +96,6 @@ func init() {
 	}
 
 	queryExpect = &msg.QueryResult{
-		Url: queryURL,
 		ResponseDataset: &msg.DataSet{
 			Categorization: &msg.DataSet_Categorization{
 				Value: []uint32{
@@ -107,10 +106,6 @@ func init() {
 			Echo: &msg.DataSet_Echo{
 				Url: queryURL,
 			},
-		},
-		RequestDataset: []uint32{
-			uint32(msg.CATEGORIZATION),
-			uint32(msg.ECHO),
 		},
 		QueryStatus: &msg.QueryStatus{
 			Complete:  true,
