@@ -42,11 +42,11 @@ var tokenHTMLTpl = template.Must(template.New("token").Parse(tokenHTMLTplStr))
 type userAccreditor struct {
 	sync.Mutex
 	oauth2.Config
-	addr    string
-	open    bool
-	urlFunc func(string)
-	ctx     context.Context
-	debug   io.Writer
+	addr               string
+	open               bool
+	authCodeURLHandler AuthCodeURLHandler
+	ctx                context.Context
+	debug              io.Writer
 }
 
 var _ oauth2.TokenSource = (*userAccreditor)(nil)
@@ -91,13 +91,31 @@ func WithEndpoint(val oauth2.Endpoint) Option {
 	}
 }
 
-// WithURLFunc returns an Option that will cause the passed in func to be called
-// in a new goroutine with the value of the URL that should be opened. This
-// allows programmatic user authentication (e.g. without interacting with the
-// browser). Overrides WithoutOpen().
-func WithURLFunc(val func(string)) Option {
+// An AuthCodeURLHandler is asynchronously passed the AuthCodeURL when Token()
+// is called
+type AuthCodeURLHandler interface {
+	AuthCodeURL(string)
+}
+
+// The AuthCodeURLHandlerFunc type is an adapter to allow the use of ordinary
+// functions as AuthCodeURLHandlers. If f is a function with the appropriate
+// signature, AuthCodeURLHandlerFunc(f) is a Handler that calls f.
+type AuthCodeURLHandlerFunc func(string)
+
+// AuthCodeURL calls f(u)
+func (f AuthCodeURLHandlerFunc) AuthCodeURL(u string) {
+	f(u)
+}
+
+var _ AuthCodeURLHandler = (*AuthCodeURLHandlerFunc)(nil)
+
+// WithAuthCodeURLHandler returns an Option that will cause the passed in
+// handler to be called in a new goroutine with the value of the URL that should
+// be opened. This allows programmatic user authentication (e.g. without
+// interacting with the browser). Overrides WithoutOpen().
+func WithAuthCodeURLHandler(val AuthCodeURLHandler) Option {
 	return func(a *userAccreditor) {
-		a.urlFunc = val
+		a.authCodeURLHandler = val
 	}
 }
 
@@ -181,8 +199,8 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 
 	u := a.AuthCodeURL(state)
 
-	if a.urlFunc != nil {
-		go a.urlFunc(u)
+	if a.authCodeURLHandler != nil {
+		go a.authCodeURLHandler.AuthCodeURL(u)
 	} else if a.open {
 		fmt.Fprintf(os.Stderr, "opening in browser: %s\n", u)
 		if err := browser.OpenURL(u); err != nil {

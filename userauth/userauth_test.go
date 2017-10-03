@@ -124,7 +124,7 @@ func TestUserAuth(t *testing.T) {
 		WithScope(),
 		WithScope(scopes...),
 		WithoutOpen(),
-		WithURLFunc(testURLHandler),
+		WithAuthCodeURLHandler(AuthCodeURLHandlerFunc(testURLHandler)),
 	)
 
 	token, err := ts.Token()
