@@ -88,9 +88,9 @@ func init() {
 
 	queryRequest = &msg.QueryRequests{
 		Url: []string{queryURL},
-		Dataset: []uint32{
-			uint32(msg.CATEGORIZATION),
-			uint32(msg.ECHO),
+		Dataset: []msg.DataSetType{
+			msg.CATEGORIZATION,
+			msg.ECHO,
 		},
 	}
 }
@@ -100,9 +100,9 @@ func queryExpect(reqID string) *msg.QueryResult {
 		RequestId: reqID,
 		ResponseDataset: &msg.DataSet{
 			Categorization: &msg.DataSet_Categorization{
-				Value: []uint32{
-					uint32(msg.BLOG_4),
-					uint32(msg.NEWS_4),
+				Value: []msg.Category{
+					msg.BLOG_4,
+					msg.NEWS_4,
 				},
 			},
 			Echo: &msg.DataSet_Echo{

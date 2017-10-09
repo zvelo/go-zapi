@@ -27,9 +27,9 @@ func TestCallbackHandler(t *testing.T) {
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
 			Categorization: &msg.DataSet_Categorization{
-				Value: []uint32{
-					uint32(msg.BLOG_4),
-					uint32(msg.NEWS_4),
+				Value: []msg.Category{
+					msg.BLOG_4,
+					msg.NEWS_4,
 				},
 			},
 		},

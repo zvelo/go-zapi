@@ -1,7 +1,6 @@
 package zapi
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"zvelo.io/go-zapi/internal/zvelo"
@@ -37,7 +36,7 @@ func CallbackHandler(h Handler, opts ...Option) http.Handler {
 		zvelo.DebugRequest(o.debug, r)
 
 		var result msg.QueryResult
-		if err := json.NewDecoder(r.Body).Decode(&result); err == nil {
+		if err := jsonUnmarshaler.Unmarshal(r.Body, &result); err == nil {
 			h.Handle(&result)
 		}
 	})

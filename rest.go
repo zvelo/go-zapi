@@ -3,17 +3,22 @@ package zapi
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"net/http"
 
 	"golang.org/x/oauth2"
 
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/pkg/errors"
 
 	"zvelo.io/msg"
 )
 
 const queryV1Path = "/v1/query"
+
+var (
+	jsonMarshaler   jsonpb.Marshaler
+	jsonUnmarshaler jsonpb.Unmarshaler
+)
 
 type restClient struct {
 	options *options
@@ -68,12 +73,12 @@ func (c *restClient) Do(ctx context.Context, req *http.Request) (*http.Response,
 func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
 	url := c.options.restURL(queryV1Path)
 
-	data, err := json.Marshal(in)
-	if err != nil {
+	var buf bytes.Buffer
+	if err := jsonMarshaler.Marshal(&buf, in); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
+	req, err := http.NewRequest("POST", url, &buf)
 	if err != nil {
 		return nil, err
 	}
@@ -91,11 +96,11 @@ func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ..
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("http error: %s (%d)", resp.Status, resp.StatusCode)
+		return nil, errors.Errorf("http error: %s", resp.Status)
 	}
 
 	var replies msg.QueryReplies
-	if err := json.NewDecoder(resp.Body).Decode(&replies); err != nil {
+	if err := jsonUnmarshaler.Unmarshal(resp.Body, &replies); err != nil {
 		return nil, err
 	}
 
@@ -125,7 +130,7 @@ func (c *restClient) QueryResultV1(ctx context.Context, reqID string, opts ...Ca
 	}
 
 	var result msg.QueryResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := jsonUnmarshaler.Unmarshal(resp.Body, &result); err != nil {
 		return nil, err
 	}
 
