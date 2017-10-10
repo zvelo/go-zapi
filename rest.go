@@ -3,7 +3,11 @@ package zapi
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"golang.org/x/oauth2"
 
@@ -13,7 +17,10 @@ import (
 	"zvelo.io/msg"
 )
 
-const queryV1Path = "/v1/query"
+const (
+	queryV1Path = "/v1/query"
+	graphQLPath = "/graphql"
+)
 
 var (
 	jsonMarshaler   jsonpb.Marshaler
@@ -51,6 +58,7 @@ func Response(h **http.Response) CallOption {
 type RESTClient interface {
 	QueryV1(ctx context.Context, in *msg.QueryRequests, opt ...CallOption) (*msg.QueryReplies, error)
 	QueryResultV1(ctx context.Context, reqID string, opt ...CallOption) (*msg.QueryResult, error)
+	GraphQL(ctx context.Context, query string, result interface{}, opt ...CallOption) error
 }
 
 // NewREST returns a properly configured RESTClient
@@ -68,6 +76,44 @@ func NewREST(ts oauth2.TokenSource, opts ...Option) RESTClient {
 
 func (c *restClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return c.client.Do(req.WithContext(ctx))
+}
+
+func (c *restClient) GraphQL(ctx context.Context, query string, result interface{}, opts ...CallOption) error {
+	url := c.options.restURL(graphQLPath)
+
+	query = `{"query":` + strconv.QuoteToASCII(query) + `}`
+
+	req, err := http.NewRequest("POST", url, strings.NewReader(query))
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.Do(ctx, req)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	for _, opt := range opts {
+		opt.after(resp)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("http error: %s", resp.Status)
+	}
+
+	if ps, ok := result.(*string); ok {
+		s, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return err
+		}
+		*ps = string(s)
+		return nil
+	}
+
+	return json.NewDecoder(resp.Body).Decode(result)
 }
 
 func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
