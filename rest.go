@@ -27,14 +27,14 @@ var (
 	jsonUnmarshaler jsonpb.Unmarshaler
 )
 
-type restClient struct {
+type restV1Client struct {
 	options *options
 	client  *http.Client
 }
 
-// CallOption configures a Call before it starts or extracts information from
-// a Call after it completes. It is only used with the RESTClient.
-// grpc.CallOption is still available for the GRPCClient.
+// CallOption configures a Call before it starts or extracts information from a
+// Call after it completes. It is only used with the RESTv1Client.
+// grpc.CallOption is still available for the GRPCv1Client.
 type CallOption interface {
 	after(*http.Response)
 }
@@ -52,33 +52,33 @@ func Response(h **http.Response) CallOption {
 	})
 }
 
-// A RESTClient implements a very similar interface to GRPCClient but uses a
+// A RESTv1Client implements a very similar interface to GRPCv1Client but uses a
 // standard HTTP/REST transport instead of gRPC. Generally the gRPC client is
 // preferred for its efficiency.
-type RESTClient interface {
-	QueryV1(ctx context.Context, in *msg.QueryRequests, opt ...CallOption) (*msg.QueryReplies, error)
-	QueryResultV1(ctx context.Context, reqID string, opt ...CallOption) (*msg.QueryResult, error)
+type RESTv1Client interface {
+	Query(ctx context.Context, in *msg.QueryRequests, opt ...CallOption) (*msg.QueryReplies, error)
+	Result(ctx context.Context, reqID string, opt ...CallOption) (*msg.QueryResult, error)
 	GraphQL(ctx context.Context, query string, result interface{}, opt ...CallOption) error
 }
 
-// NewREST returns a properly configured RESTClient
-func NewREST(ts oauth2.TokenSource, opts ...Option) RESTClient {
+// NewREST returns a properly configured RESTv1Client
+func NewREST(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
 	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
 	}
 
-	return &restClient{
+	return &restV1Client{
 		options: o,
 		client:  &http.Client{Transport: &transport{options: o}},
 	}
 }
 
-func (c *restClient) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
+func (c *restV1Client) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
 	return c.client.Do(req.WithContext(ctx))
 }
 
-func (c *restClient) GraphQL(ctx context.Context, query string, result interface{}, opts ...CallOption) error {
+func (c *restV1Client) GraphQL(ctx context.Context, query string, result interface{}, opts ...CallOption) error {
 	url := c.options.restURL(graphQLPath)
 
 	query = `{"query":` + strconv.QuoteToASCII(query) + `}`
@@ -116,7 +116,7 @@ func (c *restClient) GraphQL(ctx context.Context, query string, result interface
 	return json.NewDecoder(resp.Body).Decode(result)
 }
 
-func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
+func (c *restV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
 	url := c.options.restURL(queryV1Path)
 
 	var buf bytes.Buffer
@@ -153,7 +153,7 @@ func (c *restClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ..
 	return &replies, nil
 }
 
-func (c *restClient) QueryResultV1(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
+func (c *restV1Client) Result(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
 	url := c.options.restURL(queryV1Path, reqID)
 
 	req, err := http.NewRequest("GET", url, nil)

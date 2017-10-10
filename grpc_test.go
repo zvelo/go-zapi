@@ -56,7 +56,7 @@ func init() {
 	mockReady := make(chan struct{})
 
 	go func() {
-		if err = mock.ListenAndServeTLS(context.Background(), mockAddr, mock.WithOnReady(mockReady)); err != nil {
+		if err = mock.APIv1(mock.WhenReady(mockReady)).ListenAndServeTLS(context.Background(), mockAddr); err != nil {
 			panic(err)
 		}
 	}()
@@ -76,7 +76,7 @@ func init() {
 		WithAddr(mockAddr),
 	}
 
-	queryURL, err = mock.NewQueryURL("http://example.com",
+	queryURL, err = mock.QueryURL("http://example.com",
 		mock.WithCategories(
 			msg.BLOG_4,
 			msg.NEWS_4,
@@ -125,7 +125,7 @@ func TestGRPC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	replies, err := client.QueryV1(ctx, queryRequest)
+	replies, err := client.Query(ctx, queryRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -140,7 +140,7 @@ func TestGRPC(t *testing.T) {
 		t.Error("empty request_id")
 	}
 
-	result, err := client.QueryResultV1(ctx, &msg.QueryPollRequest{
+	result, err := client.Result(ctx, &msg.RequestID{
 		RequestId: reqID,
 	})
 	if err != nil {

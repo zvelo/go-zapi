@@ -16,30 +16,30 @@ import (
 	"zvelo.io/msg"
 )
 
-// A GRPCClient implements msg.APIClient as well as an io.Closer that, if
+// A GRPCv1Client implements msg.APIv1Client as well as an io.Closer that, if
 // closed, will close the underlying gRPC connection.
-type GRPCClient interface {
-	msg.APIClient
+type GRPCv1Client interface {
+	msg.APIv1Client
 	io.Closer
 }
 
-type grpcClient struct {
+type grpcV1Client struct {
 	options *options
-	client  msg.APIClient
+	client  msg.APIv1Client
 	io.Closer
 }
 
 // A GRPCDialer is used to simplify connecting to zveloAPI with the correct
 // options. grpc DialOptions will override the defaults.
 type GRPCDialer interface {
-	Dial(context.Context, ...grpc.DialOption) (GRPCClient, error)
+	Dial(context.Context, ...grpc.DialOption) (GRPCv1Client, error)
 }
 
 type grpcDialer struct {
 	options *options
 }
 
-func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClient, error) {
+func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Client, error) {
 	var tc tls.Config
 	if d.options.tlsInsecureSkipVerify {
 		tc.InsecureSkipVerify = true
@@ -65,9 +65,9 @@ func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCClie
 		return nil, err
 	}
 
-	return grpcClient{
+	return grpcV1Client{
 		Closer:  conn,
-		client:  msg.NewAPIClient(conn),
+		client:  msg.NewAPIv1Client(conn),
 		options: d.options,
 	}, nil
 }
@@ -82,12 +82,12 @@ func NewGRPC(ts oauth2.TokenSource, opts ...Option) GRPCDialer {
 	return grpcDialer{options: o}
 }
 
-func (c grpcClient) QueryV1(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
+func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
 	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryV1(ctx, in, opts...)
+	return c.client.Query(ctx, in, opts...)
 }
 
-func (c grpcClient) QueryResultV1(ctx context.Context, in *msg.QueryPollRequest, opts ...grpc.CallOption) (*msg.QueryResult, error) {
+func (c grpcV1Client) Result(ctx context.Context, in *msg.RequestID, opts ...grpc.CallOption) (*msg.QueryResult, error) {
 	ctx = c.options.NewOutgoingContext(ctx)
-	return c.client.QueryResultV1(ctx, in, opts...)
+	return c.client.Result(ctx, in, opts...)
 }

@@ -18,7 +18,7 @@ func TestRest(t *testing.T) {
 	client := NewREST(TestTokenSource{}, opts...)
 
 	var resp *http.Response
-	replies, err := client.QueryV1(ctx, queryRequest, Response(&resp))
+	replies, err := client.Query(ctx, queryRequest, Response(&resp))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func TestRest(t *testing.T) {
 		t.Error("empty request_id")
 	}
 
-	result, err := client.QueryResultV1(ctx, reqID)
+	result, err := client.Result(ctx, reqID)
 	if err != nil {
 		t.Fatal(err)
 	}

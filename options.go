@@ -21,11 +21,11 @@ import (
 	"zvelo.io/go-zapi/internal/zvelo"
 )
 
-// UserAgent is the user agent that will be provided by the RESTClient. It can
+// UserAgent is the user agent that will be provided by the RESTv1Client. It can
 // be overridden by providing a custom transport using the WithTransport Option.
 const UserAgent = "go-zapi v1"
 
-// DefaultAddr is used by both GRPCClient and RESTClient as the default
+// DefaultAddr is used by both GRPCv1Client and RESTv1Client as the default
 // address:port for all zveloAPI calls. It can be overridden using the WithAddr
 // Option.
 const DefaultAddr = "api.zvelo.com"
@@ -97,8 +97,8 @@ func WithForceTrace() Option {
 }
 
 // WithTransport returns an Option that will cause all requests from the
-// RESTClient to be processed by the given http.RoundTripper. If not specified,
-// http.DefaultTransport will be used.
+// RESTv1Client to be processed by the given http.RoundTripper. If not
+// specified, http.DefaultTransport will be used.
 func WithTransport(val http.RoundTripper) Option {
 	if val == nil {
 		val = http.DefaultTransport
@@ -141,8 +141,9 @@ func WithTracer(val opentracing.Tracer) Option {
 	}
 }
 
-// WithDebug returns an Option that will cause requests from the RESTClient and
-// callbacks processed by the CallbackHandler to emit debug logs to the writer
+// WithDebug returns an Option that will cause requests from the RESTv1Client
+// and callbacks processed by the CallbackHandler to emit debug logs to the
+// writer
 func WithDebug(val io.Writer) Option {
 	if val == nil {
 		val = ioutil.Discard
