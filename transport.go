@@ -1,8 +1,6 @@
 package zapi
 
 import (
-	"compress/gzip"
-	"io"
 	"net/http"
 
 	"zvelo.io/go-zapi/internal/zvelo"
@@ -34,7 +32,6 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = cloneRequest(req) // per RoundTripper contract
 
 	req.Header.Set("User-Agent", UserAgent)
-	req.Header.Set("Accept-Encoding", "gzip")
 
 	var parentCtx opentracing.SpanContext
 	if parent := opentracing.SpanFromContext(req.Context()); parent != nil {
@@ -92,38 +89,9 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	if res.Header.Get("Content-Encoding") == "gzip" {
-		r, err := gzip.NewReader(res.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		res.ContentLength = -1
-		res.Header.Del("Content-Encoding")
-		res.Header.Del("Content-Length")
-
-		res.Body = gzipReader{
-			Reader: r,
-			src:    res.Body,
-		}
-	}
-
 	zvelo.DebugResponse(t.debug, res)
 
 	ext.HTTPStatusCode.Set(clientSpan, uint16(res.StatusCode))
 
 	return res, nil
-}
-
-type gzipReader struct {
-	*gzip.Reader
-	src io.ReadCloser
-}
-
-func (r gzipReader) Close() error {
-	if err := r.Reader.Close(); err != nil {
-		return err
-	}
-
-	return r.src.Close()
 }
