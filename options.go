@@ -79,13 +79,15 @@ func (o options) NewOutgoingContext(ctx context.Context) context.Context {
 		return ctx
 	}
 
-	md := metadata.Pairs("jaeger-debug-id", zvelo.RandString(32))
-
+	var md metadata.MD
 	if oc, ok := metadata.FromOutgoingContext(ctx); ok {
-		md = metadata.Join(md, oc.Copy())
+		md = oc.Copy()
 	}
 
-	return metadata.NewOutgoingContext(ctx, md)
+	return metadata.NewOutgoingContext(ctx, metadata.Join(
+		md,
+		metadata.Pairs("jaeger-debug-id", zvelo.RandString(32)),
+	))
 }
 
 // WithForceTrace returns an Option that will cause all requests to be traced

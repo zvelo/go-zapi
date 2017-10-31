@@ -9,10 +9,12 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/oauth2"
-
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/pkg/errors"
+
+	"golang.org/x/oauth2"
+
+	"google.golang.org/grpc/metadata"
 
 	"zvelo.io/msg"
 )
@@ -61,8 +63,8 @@ type RESTv1Client interface {
 	GraphQL(ctx context.Context, query string, result interface{}, opt ...CallOption) error
 }
 
-// NewREST returns a properly configured RESTv1Client
-func NewREST(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
+// NewRESTv1 returns a properly configured RESTv1Client
+func NewRESTv1(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
 	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
@@ -86,6 +88,14 @@ func (c *restV1Client) GraphQL(ctx context.Context, query string, result interfa
 	req, err := http.NewRequest("POST", url, strings.NewReader(query))
 	if err != nil {
 		return err
+	}
+
+	if md, ok := metadata.FromOutgoingContext(ctx); ok {
+		for k, vs := range md {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -129,6 +139,14 @@ func (c *restV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ..
 		return nil, err
 	}
 
+	if md, ok := metadata.FromOutgoingContext(ctx); ok {
+		for k, vs := range md {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
+	}
+
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.Do(ctx, req)
@@ -159,6 +177,14 @@ func (c *restV1Client) Result(ctx context.Context, reqID string, opts ...CallOpt
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
+	}
+
+	if md, ok := metadata.FromOutgoingContext(ctx); ok {
+		for k, vs := range md {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
 	}
 
 	resp, err := c.Do(ctx, req)

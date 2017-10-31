@@ -9,13 +9,18 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	opentracing "github.com/opentracing/opentracing-go"
+
+	"zvelo.io/msg"
+	"zvelo.io/msg/mock"
 )
 
 func TestRest(t *testing.T) {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "test")
 	defer span.Finish()
 
-	client := NewREST(TestTokenSource{}, opts...)
+	client := NewRESTv1(TestTokenSource{}, opts...)
+
+	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
 
 	var resp *http.Response
 	replies, err := client.Query(ctx, queryRequest, Response(&resp))

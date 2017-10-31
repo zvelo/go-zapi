@@ -29,17 +29,17 @@ type grpcV1Client struct {
 	io.Closer
 }
 
-// A GRPCDialer is used to simplify connecting to zveloAPI with the correct
+// A GRPCv1Dialer is used to simplify connecting to zveloAPI with the correct
 // options. grpc DialOptions will override the defaults.
-type GRPCDialer interface {
+type GRPCv1Dialer interface {
 	Dial(context.Context, ...grpc.DialOption) (GRPCv1Client, error)
 }
 
-type grpcDialer struct {
+type grpcV1Dialer struct {
 	options *options
 }
 
-func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Client, error) {
+func (d grpcV1Dialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Client, error) {
 	var tc tls.Config
 	if d.options.tlsInsecureSkipVerify {
 		tc.InsecureSkipVerify = true
@@ -72,14 +72,14 @@ func (d grpcDialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Cl
 	}, nil
 }
 
-// NewGRPC returns a properly configured GRPCDialer
-func NewGRPC(ts oauth2.TokenSource, opts ...Option) GRPCDialer {
+// NewGRPCv1 returns a properly configured GRPCv1Dialer
+func NewGRPCv1(ts oauth2.TokenSource, opts ...Option) GRPCv1Dialer {
 	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
 	}
 
-	return grpcDialer{options: o}
+	return grpcV1Dialer{options: o}
 }
 
 func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {

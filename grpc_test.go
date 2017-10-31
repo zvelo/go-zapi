@@ -20,8 +20,8 @@ import (
 
 var (
 	opts         []Option
-	queryURL     string
 	queryRequest *msg.QueryRequests
+	queryURL     = "http://example.com"
 )
 
 type TestTokenSource struct {
@@ -76,16 +76,6 @@ func init() {
 		WithAddr(mockAddr),
 	}
 
-	queryURL, err = mock.QueryURL("http://example.com",
-		mock.WithCategories(
-			msg.BLOG_4,
-			msg.NEWS_4,
-		),
-	)
-	if err != nil {
-		panic(err)
-	}
-
 	queryRequest = &msg.QueryRequests{
 		Url: []string{queryURL},
 		Dataset: []msg.DataSetType{
@@ -119,11 +109,13 @@ func queryExpect(reqID string) *msg.QueryResult {
 func TestGRPC(t *testing.T) {
 	ctx := metadata.NewOutgoingContext(context.Background(), nil)
 
-	dialer := NewGRPC(TestTokenSource{}, opts...)
+	dialer := NewGRPCv1(TestTokenSource{}, opts...)
 	client, err := dialer.Dial(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
 
 	replies, err := client.Query(ctx, queryRequest)
 	if err != nil {
