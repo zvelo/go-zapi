@@ -2,13 +2,19 @@ package zapi
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
+	hydra "github.com/ory/hydra/sdk"
 
+	"zvelo.io/httpsig"
 	"zvelo.io/msg"
 )
 
@@ -18,11 +24,46 @@ func callbackHandler(m **msg.QueryResult) Handler {
 	})
 }
 
-func TestCallbackHandler(t *testing.T) {
-	var buf bytes.Buffer
-	var m *msg.QueryResult
+const hydraURL = "https://auth.zvelo.com"
 
-	srv := httptest.NewServer(CallbackHandler(callbackHandler(&m), WithDebug(&buf)))
+var (
+	keyset       = os.Getenv("ZVELO_KEYSET")
+	clientID     = os.Getenv("ZVELO_CLIENT_ID")
+	clientSecret = os.Getenv("ZVELO_CLIENT_SECRET")
+)
+
+func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
+	t.Helper()
+
+	hc, err := hydra.Connect(
+		hydra.ClientID(clientID),
+		hydra.ClientSecret(clientSecret),
+		hydra.ClusterURL(hydraURL),
+		hydra.Scopes("hydra.keys.get"),
+	)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	keys, err := hc.JSONWebKeys.GetKeySet(keyset)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	key, ok := keys.Key("private")[0].Key.(*ecdsa.PrivateKey)
+	if !ok {
+		t.Fatal("invalid private key")
+	}
+
+	keyID := fmt.Sprintf("%s/%s/public", hc.JSONWebKeys.Endpoint, keyset)
+
+	return keyID, key
+}
+
+func TestCallbackHandler(t *testing.T) {
+	var m *msg.QueryResult
+	srv := httptest.NewServer(CallbackHandler(callbackHandler(&m)))
 
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
@@ -44,7 +85,12 @@ func TestCallbackHandler(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err = http.Post(srv.URL, "application/json", bytes.NewReader(body)); err != nil {
+	httpClient := &http.Client{
+		Transport: httpsig.ECDSASHA256.Transport(getPrivateKey(t)),
+		Timeout:   30 * time.Second,
+	}
+
+	if _, err = httpClient.Post(srv.URL, "application/json", bytes.NewReader(body)); err != nil {
 		t.Fatal(err)
 	}
 
