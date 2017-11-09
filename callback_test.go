@@ -27,9 +27,9 @@ func callbackHandler(m **msg.QueryResult) Handler {
 const hydraURL = "https://auth.zvelo.com"
 
 var (
-	keyset       = os.Getenv("ZVELO_KEYSET")
-	clientID     = os.Getenv("ZVELO_CLIENT_ID")
-	clientSecret = os.Getenv("ZVELO_CLIENT_SECRET")
+	keyset       = os.Getenv("KEYSET")
+	clientID     = os.Getenv("APP_CLIENT_ID")
+	clientSecret = os.Getenv("APP_CLIENT_SECRET")
 )
 
 func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
