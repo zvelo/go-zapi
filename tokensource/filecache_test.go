@@ -40,7 +40,7 @@ func TestFileCache(t *testing.T) {
 
 	var err error
 
-	if err = os.RemoveAll(filepath.Join(dataDir, app)); err != nil {
+	if err = os.RemoveAll(filepath.Join(zvelo.DataDir, app)); err != nil {
 		t.Fatal(err)
 	}
 

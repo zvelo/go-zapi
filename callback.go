@@ -1,10 +1,14 @@
 package zapi
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 
 	"github.com/pkg/errors"
@@ -38,48 +42,70 @@ type Doer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-type keyResult struct {
-	key interface{}
-	err error
-}
-
 type keyGetter struct {
+	app     string
 	options *callbackOptions
-
-	sync.RWMutex
-	cache map[string]keyResult
 }
 
-func (g *keyGetter) GetKey(keyID string) (key interface{}, err error) {
-	g.RLock()
-	if data, ok := g.cache[keyID]; ok {
-		g.RUnlock()
-		return data.key, data.err
+// KeyGetter returns an httpsig.KeyGetter that will properly fetch and cache
+// zvelo public keys
+func KeyGetter(app string, opts ...CallbackOption) httpsig.KeyGetter {
+	o := callbackDefaults()
+	for _, opt := range opts {
+		opt(o)
 	}
 
-	g.RUnlock()
-	g.Lock()
+	return &keyGetter{
+		app:     app,
+		options: o,
+	}
+}
 
-	if data, ok := g.cache[keyID]; ok {
-		g.Unlock()
-		return data.key, data.err
+func decodePublicKey(rdr io.Reader) (interface{}, error) {
+	var keyset jose.JSONWebKeySet
+	if err := json.NewDecoder(rdr).Decode(&keyset); err != nil {
+		return nil, err
 	}
 
-	defer func() {
-		g.cache[keyID] = keyResult{key, err}
-		g.Unlock()
-	}()
+	keys := keyset.Key("public")
+
+	if len(keys) == 0 {
+		return nil, errors.New("no public key")
+	}
+
+	return keys[0].Key, nil
+}
+
+var keyGetterLock sync.Mutex
+
+func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
+	keyGetterLock.Lock()
+	defer keyGetterLock.Unlock()
+
+	cacheFile := filepath.Join(zvelo.DataDir, g.app, fmt.Sprintf("key_%x.json", sha256.Sum256([]byte(keyID))))
+
+	// 1. check for key cached in filesystem
+
+	// ignore errors since we can always just fetch the key
+	if f, err := os.Open(cacheFile); err == nil {
+		defer func() { _ = f.Close() }()
+		if key, err := decodePublicKey(f); err == nil {
+			return key, nil
+		}
+	}
+
+	// 2. fetch the key
 
 	req, err := http.NewRequest("GET", keyID, nil)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	zvelo.DebugRequestOut(g.options.debug, req)
 
 	resp, err := g.options.client.Do(req)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	zvelo.DebugResponse(g.options.debug, resp)
@@ -87,37 +113,23 @@ func (g *keyGetter) GetKey(keyID string) (key interface{}, err error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		err = errors.Errorf("unexpected status fetching key: %s", resp.Status)
-		return
+		return nil, errors.Errorf("unexpected status fetching key: %s", resp.Status)
 	}
 
-	var keyset jose.JSONWebKeySet
-	if err = json.NewDecoder(resp.Body).Decode(&keyset); err != nil {
-		return
+	// 3. write the json key to the cache file as we decode it
+
+	if err = os.MkdirAll(filepath.Dir(cacheFile), 0700); err != nil {
+		return nil, err
 	}
 
-	keys := keyset.Key("public")
-	if len(keys) == 0 {
-		err = errors.New("no public key in response")
-		return
+	var f *os.File
+	if f, err = os.OpenFile(cacheFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600); err != nil {
+		return nil, err
 	}
 
-	key = keys[0].Key
-	return
-}
+	defer func() { _ = f.Close() }()
 
-// KeyGetter returns an httpsig.KeyGetter that will properly fetch and cache
-// zvelo public keys
-func KeyGetter(opts ...CallbackOption) httpsig.KeyGetter {
-	o := callbackDefaults()
-	for _, opt := range opts {
-		opt(o)
-	}
-
-	return &keyGetter{
-		options: o,
-		cache:   map[string]keyResult{},
-	}
+	return decodePublicKey(io.TeeReader(resp.Body, f))
 }
 
 type callbackOptions struct {
@@ -162,7 +174,7 @@ func WithoutValidation() CallbackOption {
 
 // CallbackHandler returns an http.Handler that can be used with an http.Server
 // to receive and process zveloAPI callbacks
-func CallbackHandler(h Handler, opts ...CallbackOption) http.Handler {
+func CallbackHandler(app string, h Handler, opts ...CallbackOption) http.Handler {
 	o := callbackDefaults()
 	for _, opt := range opts {
 		opt(o)
@@ -178,7 +190,7 @@ func CallbackHandler(h Handler, opts ...CallbackOption) http.Handler {
 	}))
 
 	if !o.noValidate {
-		handler = httpsig.Middleware(httpsig.SignatureHeader, KeyGetter(opts...), handler)
+		handler = httpsig.Middleware(httpsig.SignatureHeader, KeyGetter(app, opts...), handler)
 	}
 
 	return handler

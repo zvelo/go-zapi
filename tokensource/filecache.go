@@ -9,6 +9,8 @@ import (
 	"sort"
 
 	"golang.org/x/oauth2"
+
+	"zvelo.io/go-zapi/internal/zvelo"
 )
 
 type fileCache struct {
@@ -49,14 +51,14 @@ func FileCache(src oauth2.TokenSource, app, name string, scopes ...string) oauth
 
 	return fileCache{
 		src:      src,
-		fileName: filepath.Join(dataDir, app, fmt.Sprintf("token_%x.json", hash.Sum(nil))),
+		fileName: filepath.Join(zvelo.DataDir, app, fmt.Sprintf("token_%x.json", hash.Sum(nil))),
 	}
 }
 
 func (s fileCache) Token() (*oauth2.Token, error) {
 	// 1. check for token cached in filesystem
 
-	// ignore errors since they we can always just go to the src
+	// ignore errors since we can always just go to the src
 	if f, err := os.Open(s.fileName); err == nil {
 		defer func() { _ = f.Close() }()
 

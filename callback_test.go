@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
 	hydra "github.com/ory/hydra/sdk"
 
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/httpsig"
 	"zvelo.io/msg"
 )
@@ -62,8 +64,14 @@ func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
 }
 
 func TestCallbackHandler(t *testing.T) {
+	const app = "testapp"
+
+	if err := os.RemoveAll(filepath.Join(zvelo.DataDir, app)); err != nil {
+		t.Fatal(err)
+	}
+
 	var m *msg.QueryResult
-	srv := httptest.NewServer(CallbackHandler(callbackHandler(&m)))
+	srv := httptest.NewServer(CallbackHandler(app, callbackHandler(&m)))
 
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
