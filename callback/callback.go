@@ -1,4 +1,4 @@
-package zapi
+package callback
 
 import (
 	"crypto/sha256"
@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sync"
 
+	"github.com/gogo/protobuf/jsonpb"
 	"github.com/pkg/errors"
 
 	"gopkg.in/square/go-jose.v2"
@@ -19,6 +20,8 @@ import (
 	"zvelo.io/httpsig"
 	"zvelo.io/msg"
 )
+
+var jsonUnmarshaler jsonpb.Unmarshaler
 
 // A Handler responds to a zveloAPI callback
 type Handler interface {
@@ -44,12 +47,12 @@ type Doer interface {
 
 type keyGetter struct {
 	app     string
-	options *callbackOptions
+	options *options
 }
 
 // KeyGetter returns an httpsig.KeyGetter that will properly fetch and cache
 // zvelo public keys
-func KeyGetter(app string, opts ...CallbackOption) httpsig.KeyGetter {
+func KeyGetter(app string, opts ...Option) httpsig.KeyGetter {
 	o := callbackDefaults()
 	for _, opt := range opts {
 		opt(o)
@@ -79,18 +82,22 @@ func decodePublicKey(rdr io.Reader) (interface{}, error) {
 var keyGetterLock sync.Mutex
 
 func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
-	keyGetterLock.Lock()
-	defer keyGetterLock.Unlock()
-
-	cacheFile := filepath.Join(zvelo.DataDir, g.app, fmt.Sprintf("key_%x.json", sha256.Sum256([]byte(keyID))))
+	var cacheFile string
 
 	// 1. check for key cached in filesystem
 
-	// ignore errors since we can always just fetch the key
-	if f, err := os.Open(cacheFile); err == nil {
-		defer func() { _ = f.Close() }()
-		if key, err := decodePublicKey(f); err == nil {
-			return key, nil
+	if !g.options.noCache {
+		keyGetterLock.Lock()
+		defer keyGetterLock.Unlock()
+
+		cacheFile = filepath.Join(zvelo.DataDir, g.app, fmt.Sprintf("key_%x.json", sha256.Sum256([]byte(keyID))))
+
+		// ignore errors since we can always just fetch the key
+		if f, err := os.Open(cacheFile); err == nil {
+			defer func() { _ = f.Close() }()
+			if key, err := decodePublicKey(f); err == nil {
+				return key, nil
+			}
 		}
 	}
 
@@ -116,6 +123,10 @@ func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
 		return nil, errors.Errorf("unexpected status fetching key: %s", resp.Status)
 	}
 
+	if g.options.noCache {
+		return decodePublicKey(resp.Body)
+	}
+
 	// 3. write the json key to the cache file as we decode it
 
 	if err = os.MkdirAll(filepath.Dir(cacheFile), 0700); err != nil {
@@ -132,49 +143,55 @@ func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
 	return decodePublicKey(io.TeeReader(resp.Body, f))
 }
 
-type callbackOptions struct {
+type options struct {
 	debug      io.Writer
 	client     Doer
 	noValidate bool
+	noCache    bool
 }
 
-// A CallbackOption is used to configure the CallbackHandler
-type CallbackOption func(*callbackOptions)
+// An Option is used to configure the HTTPHandler
+type Option func(*options)
 
-func callbackDefaults() *callbackOptions {
-	return &callbackOptions{
+func callbackDefaults() *options {
+	return &options{
 		debug:  ioutil.Discard,
 		client: http.DefaultClient,
 	}
 }
 
-// WithKeyGetterClient causes the CallbackHandler to use the passed in
+// WithoutCache prevents the KeyGetter from caching keys to the filesystem
+func WithoutCache() Option {
+	return func(o *options) { o.noCache = true }
+}
+
+// WithKeyGetterClient causes the HTTPHandler to use the passed in
 // http.Client, instead of http.DefaultClient
-func WithKeyGetterClient(val Doer) CallbackOption {
+func WithKeyGetterClient(val Doer) Option {
 	if val == nil {
 		val = http.DefaultClient
 	}
 
-	return func(o *callbackOptions) { o.client = val }
+	return func(o *options) { o.client = val }
 }
 
-// WithCallbackDebug causes the CallbackHandler to emit debug logs to the writer
-func WithCallbackDebug(val io.Writer) CallbackOption {
+// WithDebug causes the HTTPHandler to emit debug logs to the writer
+func WithDebug(val io.Writer) Option {
 	if val == nil {
 		val = ioutil.Discard
 	}
 
-	return func(o *callbackOptions) { o.debug = val }
+	return func(o *options) { o.debug = val }
 }
 
-// WithoutValidation causes the CallbackHandler to skip signature validation
-func WithoutValidation() CallbackOption {
-	return func(o *callbackOptions) { o.noValidate = true }
+// WithoutValidation causes the HTTPHandler to skip signature validation
+func WithoutValidation() Option {
+	return func(o *options) { o.noValidate = true }
 }
 
-// CallbackHandler returns an http.Handler that can be used with an http.Server
+// HTTPHandler returns an http.Handler that can be used with an http.Server
 // to receive and process zveloAPI callbacks
-func CallbackHandler(app string, h Handler, opts ...CallbackOption) http.Handler {
+func HTTPHandler(app string, h Handler, opts ...Option) http.Handler {
 	o := callbackDefaults()
 	for _, opt := range opts {
 		opt(o)

@@ -1,4 +1,4 @@
-package zapi
+package callback
 
 import (
 	"bytes"
@@ -20,7 +20,7 @@ import (
 	"zvelo.io/msg"
 )
 
-func callbackHandler(m **msg.QueryResult) Handler {
+func handler(m **msg.QueryResult) Handler {
 	return HandlerFunc(func(in *msg.QueryResult) {
 		*m = in
 	})
@@ -71,7 +71,7 @@ func TestCallbackHandler(t *testing.T) {
 	}
 
 	var m *msg.QueryResult
-	srv := httptest.NewServer(CallbackHandler(app, callbackHandler(&m)))
+	srv := httptest.NewServer(HTTPHandler(app, handler(&m)))
 
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
