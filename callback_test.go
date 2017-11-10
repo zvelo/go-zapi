@@ -98,4 +98,8 @@ func TestCallbackHandler(t *testing.T) {
 		t.Log(cmp.Diff(&r, m))
 		t.Error("got unexpected result")
 	}
+
+	if _, err = httpClient.Post(srv.URL, "application/json", bytes.NewReader(body)); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -38,38 +38,48 @@ type Doer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
+type keyResult struct {
+	key interface{}
+	err error
+}
+
 type keyGetter struct {
 	options *callbackOptions
 
 	sync.RWMutex
-	cache map[string]interface{}
+	cache map[string]keyResult
 }
 
 func (g *keyGetter) GetKey(keyID string) (key interface{}, err error) {
 	g.RLock()
-	if key, ok := g.cache[keyID]; ok {
+	if data, ok := g.cache[keyID]; ok {
 		g.RUnlock()
-		return key, nil
+		return data.key, data.err
 	}
 
 	g.RUnlock()
 	g.Lock()
-	defer g.Unlock()
 
-	if key, ok := g.cache[keyID]; ok {
-		return key, nil
+	if data, ok := g.cache[keyID]; ok {
+		g.Unlock()
+		return data.key, data.err
 	}
+
+	defer func() {
+		g.cache[keyID] = keyResult{key, err}
+		g.Unlock()
+	}()
 
 	req, err := http.NewRequest("GET", keyID, nil)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	zvelo.DebugRequestOut(g.options.debug, req)
 
 	resp, err := g.options.client.Do(req)
 	if err != nil {
-		return nil, nil
+		return
 	}
 
 	zvelo.DebugResponse(g.options.debug, resp)
@@ -77,20 +87,23 @@ func (g *keyGetter) GetKey(keyID string) (key interface{}, err error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("unexpected status fetching key: %s", resp.Status)
+		err = errors.Errorf("unexpected status fetching key: %s", resp.Status)
+		return
 	}
 
 	var keyset jose.JSONWebKeySet
 	if err = json.NewDecoder(resp.Body).Decode(&keyset); err != nil {
-		return nil, err
+		return
 	}
 
 	keys := keyset.Key("public")
 	if len(keys) == 0 {
-		return nil, errors.New("no public key in response")
+		err = errors.New("no public key in response")
+		return
 	}
 
-	return keys[0].Key, nil
+	key = keys[0].Key
+	return
 }
 
 // KeyGetter returns an httpsig.KeyGetter that will properly fetch and cache
@@ -101,7 +114,10 @@ func KeyGetter(opts ...CallbackOption) httpsig.KeyGetter {
 		opt(o)
 	}
 
-	return &keyGetter{options: o}
+	return &keyGetter{
+		options: o,
+		cache:   map[string]keyResult{},
+	}
 }
 
 type callbackOptions struct {
