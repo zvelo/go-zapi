@@ -11,15 +11,6 @@ import (
 	"github.com/fatih/color"
 )
 
-func printDump(w io.Writer, dump []byte, attr color.Attribute, prefix string) {
-	write := color.New(attr).FprintfFunc()
-	parts := strings.Split(string(dump), "\n")
-	for _, line := range parts {
-		write(w, "%s%s\n", prefix, line)
-	}
-	write(w, "\n")
-}
-
 // DebugRequest logs incoming http.Requests to stderr
 func DebugRequest(w io.Writer, req *http.Request) {
 	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
@@ -42,7 +33,11 @@ func debugHTTP(w io.Writer, attr color.Attribute, prefix string, fn func() ([]by
 		return
 	}
 
-	printDump(w, dump, attr, prefix)
+	write := color.New(attr).FprintfFunc()
+	parts := strings.Split(string(dump), "\n")
+	for _, line := range parts {
+		write(w, "%s%s\n", prefix, line)
+	}
 }
 
 var chars = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
