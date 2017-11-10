@@ -21,7 +21,7 @@ import (
 )
 
 func handler(m **msg.QueryResult) Handler {
-	return HandlerFunc(func(in *msg.QueryResult) {
+	return HandlerFunc(func(_ http.ResponseWriter, _ *http.Request, in *msg.QueryResult) {
 		*m = in
 	})
 }
@@ -71,7 +71,7 @@ func TestCallbackHandler(t *testing.T) {
 	}
 
 	var m *msg.QueryResult
-	srv := httptest.NewServer(HTTPHandler(app, handler(&m)))
+	srv := httptest.NewServer(Middleware(KeyGetter(MemKeyCache()), handler(&m)))
 
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
