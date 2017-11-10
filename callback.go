@@ -105,8 +105,9 @@ func KeyGetter(opts ...CallbackOption) httpsig.KeyGetter {
 }
 
 type callbackOptions struct {
-	debug  io.Writer
-	client Doer
+	debug      io.Writer
+	client     Doer
+	noValidate bool
 }
 
 // A CallbackOption is used to configure the CallbackHandler
@@ -138,6 +139,11 @@ func WithCallbackDebug(val io.Writer) CallbackOption {
 	return func(o *callbackOptions) { o.debug = val }
 }
 
+// WithoutValidation causes the CallbackHandler to skip signature validation
+func WithoutValidation() CallbackOption {
+	return func(o *callbackOptions) { o.noValidate = true }
+}
+
 // CallbackHandler returns an http.Handler that can be used with an http.Server
 // to receive and process zveloAPI callbacks
 func CallbackHandler(h Handler, opts ...CallbackOption) http.Handler {
@@ -146,7 +152,7 @@ func CallbackHandler(h Handler, opts ...CallbackOption) http.Handler {
 		opt(o)
 	}
 
-	return httpsig.Middleware(httpsig.SignatureHeader, KeyGetter(opts...), http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		zvelo.DebugRequest(o.debug, r)
 
 		var result msg.QueryResult
@@ -154,4 +160,10 @@ func CallbackHandler(h Handler, opts ...CallbackOption) http.Handler {
 			h.Handle(&result)
 		}
 	}))
+
+	if !o.noValidate {
+		handler = httpsig.Middleware(httpsig.SignatureHeader, KeyGetter(opts...), handler)
+	}
+
+	return handler
 }
