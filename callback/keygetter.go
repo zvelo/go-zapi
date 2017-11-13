@@ -3,12 +3,21 @@ package callback
 import (
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/pkg/errors"
 
 	"gopkg.in/square/go-jose.v2"
 
 	"zvelo.io/httpsig"
+)
+
+// KeyGetter validates the scheme and hostname of the KeyID before fetching.
+// Only those that match these values will be considered valid.
+var (
+	KeyIDScheme   = "https"
+	KeyIDHostname = "zvelo.com"
 )
 
 // KeyCache is a simple interface for caching JSON Web Keys
@@ -38,7 +47,22 @@ func extractKey(keyset *jose.JSONWebKeySet) (interface{}, error) {
 }
 
 func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
-	// 1. check for key cached in filesystem
+	// 1. validate that the key should be trusted
+
+	u, err := url.Parse(keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	if u.Scheme != KeyIDScheme {
+		return nil, errors.Errorf("keyID (%s) does not have https scheme", keyID)
+	}
+
+	if h := u.Hostname(); h != KeyIDHostname && !strings.HasSuffix(h, "."+KeyIDHostname) {
+		return nil, errors.Errorf("keyID (%s) does not have a zvelo.com hostname", keyID)
+	}
+
+	// 2. check for key cached in filesystem
 
 	if g.cache != nil {
 		if keyset := g.cache.Get(keyID); keyset != nil {
@@ -46,7 +70,7 @@ func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
 		}
 	}
 
-	// 2. fetch the key
+	// 3. fetch the key
 
 	resp, err := http.Get(keyID)
 	if err != nil {
@@ -64,7 +88,7 @@ func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
 		return nil, err
 	}
 
-	// 3. write the json key to the cache file as we decode it
+	// 4. write the json key to the cache file as we decode it
 
 	if g.cache != nil {
 		g.cache.Set(keyID, &keyset)
