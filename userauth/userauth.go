@@ -236,7 +236,7 @@ func (a *userAccreditor) Token() (*oauth2.Token, error) {
 		}
 	}()
 
-	defer func() { _ = server.Shutdown(a.ctx) }()
+	defer func() { _ = server.Close() }()
 
 	select {
 	case <-a.ctx.Done():
