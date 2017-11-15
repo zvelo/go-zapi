@@ -22,8 +22,8 @@ func DebugRequestOut(w io.Writer, req *http.Request) {
 }
 
 // DebugResponse logs received http.Responses to stderr
-func DebugResponse(w io.Writer, resp *http.Response) {
-	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, true) })
+func DebugResponse(w io.Writer, resp *http.Response, body bool) {
+	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, body) })
 }
 
 func debugHTTP(w io.Writer, attr color.Attribute, prefix string, fn func() ([]byte, error)) {

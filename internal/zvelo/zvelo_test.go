@@ -38,7 +38,7 @@ func TestDebug(t *testing.T) {
 
 	buf.Reset()
 
-	DebugResponse(&buf, resp)
+	DebugResponse(&buf, resp, true)
 
 	if buf.Len() == 0 {
 		t.Error("DebugResponse didn't write any data")

@@ -28,6 +28,10 @@ func cloneRequest(r *http.Request) *http.Request {
 	return r2
 }
 
+type key int
+
+const debugDumpResponseBodyKey key = 0
+
 func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	req = cloneRequest(req) // per RoundTripper contract
 
@@ -89,7 +93,12 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 
-	zvelo.DebugResponse(t.debug, res)
+	dumpRespBody := true
+	if val, ok := req.Context().Value(debugDumpResponseBodyKey).(bool); ok {
+		dumpRespBody = val
+	}
+
+	zvelo.DebugResponse(t.debug, res, dumpRespBody)
 
 	ext.HTTPStatusCode.Set(clientSpan, uint16(res.StatusCode))
 

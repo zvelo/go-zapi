@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"io"
 
+	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 
 	"golang.org/x/oauth2"
@@ -90,4 +91,18 @@ func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...
 func (c grpcV1Client) Result(ctx context.Context, in *msg.RequestID, opts ...grpc.CallOption) (*msg.QueryResult, error) {
 	ctx = c.options.NewOutgoingContext(ctx)
 	return c.client.Result(ctx, in, opts...)
+}
+
+func (c grpcV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...grpc.CallOption) (*empty.Empty, error) {
+	ctx = c.options.NewOutgoingContext(ctx)
+	return c.client.Suggest(ctx, in, opts...)
+}
+
+func (c grpcV1Client) Stream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (msg.APIv1_StreamClient, error) {
+	if in == nil {
+		in = &empty.Empty{}
+	}
+
+	ctx = c.options.NewOutgoingContext(ctx)
+	return c.client.Stream(ctx, in, opts...)
 }

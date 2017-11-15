@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/google/go-cmp/cmp"
+	opentracing "github.com/opentracing/opentracing-go"
+
 	"golang.org/x/oauth2"
 
 	"google.golang.org/grpc/metadata"
-
-	"github.com/google/go-cmp/cmp"
-	opentracing "github.com/opentracing/opentracing-go"
 
 	"zvelo.io/msg"
 	"zvelo.io/msg/mock"
@@ -117,6 +117,20 @@ func TestGRPC(t *testing.T) {
 
 	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
 
+	stream, err := client.Stream(ctx, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	streamCh := make(chan *msg.QueryResult)
+	go func() {
+		result, serr := stream.Recv()
+		if serr != nil {
+			t.Error(serr)
+		}
+		streamCh <- result
+	}()
+
 	replies, err := client.Query(ctx, queryRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -139,12 +153,32 @@ func TestGRPC(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(result, queryExpect(reqID)) {
-		t.Log(cmp.Diff(result, queryExpect(reqID)))
-		t.Error("got unexpected result")
+	expect := queryExpect(reqID)
+	resultEqual(t, result, expect)
+	resultEqual(t, <-streamCh, expect)
+
+	_, err = client.Suggest(ctx, &msg.Suggestion{
+		Url: "http://example.com",
+		Dataset: &msg.DataSet{
+			Echo: &msg.DataSet_Echo{
+				Url: "http://example.com",
+			},
+		},
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	if err = client.Close(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func resultEqual(t *testing.T, result, expect *msg.QueryResult) {
+	t.Helper()
+
+	if !cmp.Equal(result, expect) {
+		t.Log(cmp.Diff(result, expect))
+		t.Error("got unexpected result")
 	}
 }

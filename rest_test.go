@@ -7,20 +7,33 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/google/go-cmp/cmp"
 	opentracing "github.com/opentracing/opentracing-go"
 
 	"zvelo.io/msg"
 	"zvelo.io/msg/mock"
 )
 
-func TestRest(t *testing.T) {
+func TestREST(t *testing.T) {
 	span, ctx := opentracing.StartSpanFromContext(context.Background(), "test")
 	defer span.Finish()
 
 	client := NewRESTv1(TestTokenSource{}, opts...)
 
 	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
+
+	streamCh := make(chan *msg.QueryResult)
+	stream, err := client.Stream(ctx)
+	if err != nil {
+		t.Error(err)
+	}
+
+	go func() {
+		result, serr := stream.Recv()
+		if serr != nil {
+			t.Error(serr)
+		}
+		streamCh <- result
+	}()
 
 	var resp *http.Response
 	replies, err := client.Query(ctx, queryRequest, Response(&resp))
@@ -43,9 +56,20 @@ func TestRest(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if !cmp.Equal(result, queryExpect(reqID)) {
-		t.Log(cmp.Diff(result, queryExpect(reqID)))
-		t.Error("got unexpected result")
+	expect := queryExpect(reqID)
+	resultEqual(t, result, expect)
+	resultEqual(t, <-streamCh, expect)
+
+	err = client.Suggest(ctx, &msg.Suggestion{
+		Url: "http://example.com",
+		Dataset: &msg.DataSet{
+			Echo: &msg.DataSet_Echo{
+				Url: "http://example.com",
+			},
+		},
+	})
+	if err != nil {
+		t.Error(err)
 	}
 
 	var s string
@@ -73,7 +97,6 @@ func TestRest(t *testing.T) {
 	if err = client.GraphQL(ctx, buf.String(), &s); err != nil {
 		t.Fatal(err)
 	}
-
 }
 
 type graphQLReply struct {

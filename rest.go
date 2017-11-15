@@ -4,24 +4,30 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/gogo/protobuf/jsonpb"
+	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 
 	"golang.org/x/oauth2"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"zvelo.io/msg"
 )
 
 const (
-	queryV1Path = "/v1/query"
-	graphQLPath = "/graphql"
+	queryV1Path   = "/v1/query"
+	suggestV1Path = "/v1/suggest"
+	streamV1Path  = "/v1/stream"
+	graphQLPath   = "/graphql"
 )
 
 var (
@@ -54,13 +60,21 @@ func Response(h **http.Response) CallOption {
 	})
 }
 
+// RESTv1StreamClient provides an interface to receive streamed query results
+// from zveloAPI servers.
+type RESTv1StreamClient interface {
+	Recv() (*msg.QueryResult, error)
+}
+
 // A RESTv1Client implements a very similar interface to GRPCv1Client but uses a
 // standard HTTP/REST transport instead of gRPC. Generally the gRPC client is
 // preferred for its efficiency.
 type RESTv1Client interface {
-	Query(ctx context.Context, in *msg.QueryRequests, opt ...CallOption) (*msg.QueryReplies, error)
-	Result(ctx context.Context, reqID string, opt ...CallOption) (*msg.QueryResult, error)
-	GraphQL(ctx context.Context, query string, result interface{}, opt ...CallOption) error
+	Query(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error)
+	Result(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error)
+	GraphQL(ctx context.Context, query string, result interface{}, opts ...CallOption) error
+	Suggest(ctx context.Context, in *msg.Suggestion, opts ...CallOption) error
+	Stream(ctx context.Context) (RESTv1StreamClient, error)
 }
 
 // NewRESTv1 returns a properly configured RESTv1Client
@@ -76,46 +90,19 @@ func NewRESTv1(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
 	}
 }
 
-func (c *restV1Client) Do(ctx context.Context, req *http.Request) (*http.Response, error) {
-	return c.client.Do(req.WithContext(ctx))
-}
-
 func (c *restV1Client) GraphQL(ctx context.Context, query string, result interface{}, opts ...CallOption) error {
 	url := c.options.restURL(graphQLPath)
 
 	query = `{"query":` + strconv.QuoteToASCII(query) + `}`
 
-	req, err := http.NewRequest("POST", url, strings.NewReader(query))
+	body, err := c.do(ctx, "POST", url, strings.NewReader(query), opts...)
 	if err != nil {
 		return err
 	}
-
-	if md, ok := metadata.FromOutgoingContext(ctx); ok {
-		for k, vs := range md {
-			for _, v := range vs {
-				req.Header.Add(k, v)
-			}
-		}
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.Do(ctx, req)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	for _, opt := range opts {
-		opt.after(resp)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return errors.Errorf("http error: %s", resp.Status)
-	}
+	defer func() { _ = body.Close() }()
 
 	if ps, ok := result.(*string); ok {
-		s, err := ioutil.ReadAll(resp.Body)
+		s, err := ioutil.ReadAll(body)
 		if err != nil {
 			return err
 		}
@@ -123,18 +110,34 @@ func (c *restV1Client) GraphQL(ctx context.Context, query string, result interfa
 		return nil
 	}
 
-	return json.NewDecoder(resp.Body).Decode(result)
+	return json.NewDecoder(body).Decode(result)
 }
 
 func (c *restV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...CallOption) (*msg.QueryReplies, error) {
 	url := c.options.restURL(queryV1Path)
-
-	var buf bytes.Buffer
-	if err := jsonMarshaler.Marshal(&buf, in); err != nil {
+	var replies msg.QueryReplies
+	if err := c.doPB(ctx, "POST", url, in, &replies, opts...); err != nil {
 		return nil, err
 	}
+	return &replies, nil
+}
 
-	req, err := http.NewRequest("POST", url, &buf)
+func (c *restV1Client) Result(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
+	url := c.options.restURL(queryV1Path, reqID)
+	var result msg.QueryResult
+	if err := c.doPB(ctx, "GET", url, nil, &result, opts...); err != nil {
+		return nil, err
+	}
+	return &result, nil
+}
+
+func (c *restV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...CallOption) error {
+	url := c.options.restURL(suggestV1Path)
+	return c.doPB(ctx, "POST", url, in, nil, opts...)
+}
+
+func (c *restV1Client) do(ctx context.Context, method, url string, body io.Reader, opts ...CallOption) (io.ReadCloser, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -149,60 +152,106 @@ func (c *restV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ..
 
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := c.Do(ctx, req)
+	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
 
 	for _, opt := range opts {
 		opt.after(resp)
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		_ = resp.Body.Close()
 		return nil, errors.Errorf("http error: %s", resp.Status)
 	}
 
-	var replies msg.QueryReplies
-	if err := jsonUnmarshaler.Unmarshal(resp.Body, &replies); err != nil {
-		return nil, err
-	}
-
-	return &replies, nil
+	return resp.Body, nil
 }
 
-func (c *restV1Client) Result(ctx context.Context, reqID string, opts ...CallOption) (*msg.QueryResult, error) {
-	url := c.options.restURL(queryV1Path, reqID)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	if md, ok := metadata.FromOutgoingContext(ctx); ok {
-		for k, vs := range md {
-			for _, v := range vs {
-				req.Header.Add(k, v)
-			}
+func (c *restV1Client) doPB(ctx context.Context, method, url string, in, out proto.Message, opts ...CallOption) error {
+	var reqBody io.Reader
+	if in != nil {
+		var buf bytes.Buffer
+		if err := jsonMarshaler.Marshal(&buf, in); err != nil {
+			return err
 		}
+		reqBody = &buf
 	}
 
-	resp, err := c.Do(ctx, req)
+	body, err := c.do(ctx, method, url, reqBody, opts...)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = body.Close() }()
+
+	if out == nil {
+		return nil
+	}
+
+	return jsonUnmarshaler.Unmarshal(body, out)
+}
+
+type restV1StreamClient struct {
+	io.Closer
+	*json.Decoder
+}
+
+func (c *restV1Client) Stream(ctx context.Context) (RESTv1StreamClient, error) {
+	url := c.options.restURL(streamV1Path)
+
+	ctx = context.WithValue(ctx, debugDumpResponseBodyKey, false)
+
+	body, err := c.do(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	defer func() { _ = resp.Body.Close() }()
 
-	for _, opt := range opts {
-		opt.after(resp)
+	return restV1StreamClient{
+		Closer:  body,
+		Decoder: json.NewDecoder(body),
+	}, nil
+}
+
+type streamError struct {
+	Code    codes.Code `json:"grpc_code,omitempty"`
+	Message string     `json:"message,omitempty"`
+}
+
+func (e *streamError) Err() error {
+	if e == nil {
+		return nil
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, errors.Errorf("http error: %s (%d)", resp.Status, resp.StatusCode)
+	return status.Error(e.Code, e.Message)
+}
+
+type streamItem struct {
+	Result json.RawMessage `json:"result"`
+	Error  *streamError
+}
+
+func (i streamItem) Err() error {
+	return i.Error.Err()
+}
+
+func (c restV1StreamClient) Recv() (*msg.QueryResult, error) {
+	var item streamItem
+
+	if err := c.Decode(&item); err != nil {
+		if err == io.EOF {
+			_ = c.Close()
+		}
+
+		return nil, err
+	}
+
+	if err := item.Err(); err != nil {
+		return nil, err
 	}
 
 	var result msg.QueryResult
-	if err := jsonUnmarshaler.Unmarshal(resp.Body, &result); err != nil {
+	if err := jsonUnmarshaler.Unmarshal(bytes.NewReader(item.Result), &result); err != nil {
 		return nil, err
 	}
 

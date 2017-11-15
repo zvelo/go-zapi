@@ -6,6 +6,7 @@
   name = "github.com/google/go-cmp"
   version = "0.1.0"
 
+# 1.0.2 was too old
 [[constraint]]
   name = "github.com/opentracing/opentracing-go"
   branch = "master"
@@ -16,7 +17,7 @@
 
 [[constraint]]
   name = "google.golang.org/grpc"
-  version = "1.6.0"
+  version = "1.7.3"
 
 [[constraint]]
   name = "github.com/ory/hydra"
@@ -28,7 +29,7 @@
 
 [[constraint]]
   name = "zvelo.io/msg"
-  version = "~1.7.0"
+  version = "~1.9.0"
 
 [[constraint]]
   name = "zvelo.io/httpsig"
