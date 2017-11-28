@@ -1,10 +1,12 @@
 package callback
 
 import (
+	"io"
 	"net/http"
 
 	"github.com/gogo/protobuf/jsonpb"
 
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/httpsig"
 	"zvelo.io/msg"
 )
@@ -31,7 +33,7 @@ var _ Handler = (*HandlerFunc)(nil)
 // Middleware returns an http.Handler that can be used with an http.Server
 // to receive and process zveloAPI callbacks. If getter is not nil, it will be
 // used to validate HTTP Signatures on the incoming request.
-func Middleware(getter httpsig.KeyGetter, h Handler) http.Handler {
+func Middleware(getter httpsig.KeyGetter, h Handler, debug io.Writer) http.Handler {
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var result msg.QueryResult
 		if err := jsonUnmarshaler.Unmarshal(r.Body, &result); err == nil {
@@ -43,5 +45,5 @@ func Middleware(getter httpsig.KeyGetter, h Handler) http.Handler {
 		handler = httpsig.Middleware(httpsig.SignatureHeader, getter, handler)
 	}
 
-	return handler
+	return zvelo.DebugHandler(debug, handler)
 }
