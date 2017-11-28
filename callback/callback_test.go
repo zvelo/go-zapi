@@ -71,7 +71,7 @@ func TestCallbackHandler(t *testing.T) {
 	}
 
 	var m *msg.QueryResult
-	srv := httptest.NewServer(Middleware(KeyGetter(MemKeyCache()), handler(&m)))
+	srv := httptest.NewServer(Middleware(KeyGetter(MemKeyCache()), handler(&m), nil))
 
 	r := msg.QueryResult{
 		ResponseDataset: &msg.DataSet{
