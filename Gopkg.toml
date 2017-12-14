@@ -29,7 +29,7 @@
 
 [[constraint]]
   name = "zvelo.io/msg"
-  version = "~1.9.0"
+  version = "~1.9.3"
 
 [[constraint]]
   name = "zvelo.io/httpsig"
