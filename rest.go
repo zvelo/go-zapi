@@ -32,7 +32,9 @@ const (
 
 var (
 	jsonMarshaler   jsonpb.Marshaler
-	jsonUnmarshaler jsonpb.Unmarshaler
+	jsonUnmarshaler = jsonpb.Unmarshaler{
+		AllowUnknownFields: true,
+	}
 )
 
 type restV1Client struct {
@@ -136,6 +138,11 @@ func (c *restV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...
 	return c.doPB(ctx, "POST", url, in, nil, opts...)
 }
 
+type errorBody struct {
+	Error string     `json:"error"`
+	Code  codes.Code `json:"code"`
+}
+
 func (c *restV1Client) do(ctx context.Context, method, url string, body io.Reader, opts ...CallOption) (io.ReadCloser, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
@@ -162,6 +169,12 @@ func (c *restV1Client) do(ctx context.Context, method, url string, body io.Reade
 	}
 
 	if resp.StatusCode != http.StatusOK {
+		// try to resolve the body as a grpc error
+		var eb errorBody
+		if err = json.NewDecoder(resp.Body).Decode(&eb); err == nil && eb.Error != "" && eb.Code != 0 {
+			_ = resp.Body.Close()
+			return nil, status.Error(eb.Code, eb.Error)
+		}
 		_ = resp.Body.Close()
 		return nil, errors.Errorf("http error: %s", resp.Status)
 	}
