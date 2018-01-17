@@ -22,12 +22,12 @@ func TestREST(t *testing.T) {
 	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
 
 	streamCh := make(chan *msg.QueryResult)
-	stream, err := client.Stream(ctx)
-	if err != nil {
-		t.Error(err)
-	}
-
 	go func() {
+		stream, err := client.Stream(ctx)
+		if err != nil {
+			t.Error(err)
+		}
+
 		result, serr := stream.Recv()
 		if serr != nil {
 			t.Error(serr)
