@@ -21,6 +21,12 @@ import (
 	"zvelo.io/go-zapi/internal/zvelo"
 )
 
+// TraceHeader is the response header that includes the trace id
+const TraceHeader = "zvelo-trace-id"
+
+// DebugHeader is the request header to ask that a request be sampled
+const DebugHeader = "zvelo-debug-id"
+
 // UserAgent is the user agent that will be provided by the RESTv1Client. It can
 // be overridden by providing a custom transport using the WithTransport Option.
 const UserAgent = "go-zapi v1"
@@ -37,7 +43,7 @@ type options struct {
 	debug                 io.Writer
 	transport             http.RoundTripper
 	tracerFunc            func() opentracing.Tracer
-	forceTrace            bool
+	trace                 bool
 	tlsInsecureSkipVerify bool
 }
 
@@ -75,7 +81,7 @@ func (o options) restURL(dir string, elem ...string) string {
 }
 
 func (o options) NewOutgoingContext(ctx context.Context) context.Context {
-	if !o.forceTrace {
+	if !o.trace {
 		return ctx
 	}
 
@@ -86,15 +92,15 @@ func (o options) NewOutgoingContext(ctx context.Context) context.Context {
 
 	return metadata.NewOutgoingContext(ctx, metadata.Join(
 		md,
-		metadata.Pairs("jaeger-debug-id", zvelo.RandString(32)),
+		metadata.Pairs(DebugHeader, zvelo.RandString(32)),
 	))
 }
 
-// WithForceTrace returns an Option that will cause all requests to be traced
+// WithTrace returns an Option that will cause all requests to be traced
 // by the api server
-func WithForceTrace() Option {
+func WithTrace() Option {
 	return func(o *options) {
-		o.forceTrace = true
+		o.trace = true
 	}
 }
 

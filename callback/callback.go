@@ -11,7 +11,9 @@ import (
 	"zvelo.io/msg"
 )
 
-var jsonUnmarshaler jsonpb.Unmarshaler
+var jsonUnmarshaler = jsonpb.Unmarshaler{
+	AllowUnknownFields: true,
+}
 
 // A Handler responds to a zveloAPI callback
 type Handler interface {

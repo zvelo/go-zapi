@@ -78,8 +78,8 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		)
 	}
 
-	if t.forceTrace {
-		req.Header.Set("jaeger-debug-id", zvelo.RandString(32))
+	if t.trace {
+		req.Header.Set(DebugHeader, zvelo.RandString(32))
 	}
 
 	zvelo.DebugRequestOut(t.debug, req)

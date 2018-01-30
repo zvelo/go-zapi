@@ -64,7 +64,7 @@ func init() {
 	<-mockReady
 
 	opts = []Option{
-		WithForceTrace(),
+		WithTrace(),
 		WithTLSInsecureSkipVerify(),
 		WithTransport(http.DefaultTransport),
 		WithTransport(nil),
