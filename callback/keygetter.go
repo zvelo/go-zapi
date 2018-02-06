@@ -77,7 +77,7 @@ func (g *keyGetter) GetKey(keyID string) (interface{}, error) {
 		return nil, err
 	}
 
-	defer func() { _ = resp.Body.Close() }()
+	defer func() { _ = resp.Body.Close() }() // #nosec
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("unexpected status fetching key: %s", resp.Status)

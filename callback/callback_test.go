@@ -2,18 +2,23 @@ package callback
 
 import (
 	"bytes"
+	"context"
 	"crypto/ecdsa"
 	"encoding/json"
-	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	hydra "github.com/ory/hydra/sdk"
+	jose "gopkg.in/square/go-jose.v2"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 
 	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/httpsig"
@@ -37,19 +42,30 @@ var (
 func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
 	t.Helper()
 
-	hc, err := hydra.Connect(
-		hydra.ClientID(clientID),
-		hydra.ClientSecret(clientSecret),
-		hydra.ClusterURL(hydraURL),
-		hydra.Scopes("hydra.keys.get"),
-	)
+	config := clientcredentials.Config{
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
+		TokenURL:     "https://auth.zvelo.com/oauth2/token",
+		Scopes:       []string{"hydra.keys.get"},
+	}
 
+	client := oauth2.NewClient(context.Background(), config.TokenSource(context.Background()))
+
+	resp, err := client.Get(hydraURL + "/" + path.Join("keys", keyset))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	keys, err := hc.JSONWebKeys.GetKeySet(keyset)
-	if err != nil {
+	defer func() { _ = resp.Body.Close() }()
+
+	var keys jose.JSONWebKeySet
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := ioutil.ReadAll(resp.Body)
+		t.Fatalf("Expected status code %d, got %d.\n%s\n", http.StatusOK, resp.StatusCode, body)
+	}
+
+	if err = json.NewDecoder(resp.Body).Decode(&keys); err != nil {
 		t.Fatal(err)
 	}
 
@@ -58,7 +74,7 @@ func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
 		t.Fatal("invalid private key")
 	}
 
-	keyID := fmt.Sprintf("%s/%s/public", hc.JSONWebKeys.Endpoint, keyset)
+	keyID := hydraURL + "/" + path.Join("keys", keyset, "public")
 
 	return keyID, key
 }
