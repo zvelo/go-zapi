@@ -1,6 +1,11 @@
 package zvelo
 
-import "os"
+import (
+	"os"
+	"path/filepath"
+)
 
 // C:\Users\<username>\AppData\Local
-var DataDir = os.Getenv("LOCALAPPDATA")
+func DataDir(name string) string {
+	return filepath.Join(os.Getenv("LOCALAPPDATA"), name)
+}
