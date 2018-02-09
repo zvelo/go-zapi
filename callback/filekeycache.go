@@ -24,7 +24,7 @@ type fileKeyCache struct {
 }
 
 func (c fileKeyCache) cacheFile(keyID string) string {
-	return filepath.Join(zvelo.DataDir, c.cacheName, fmt.Sprintf("key_%x.json", sha256.Sum256([]byte(keyID))))
+	return filepath.Join(zvelo.DataDir(c.cacheName), fmt.Sprintf("key_%x.json", sha256.Sum256([]byte(keyID))))
 }
 
 func (c fileKeyCache) Get(keyID string) *jose.JSONWebKeySet {

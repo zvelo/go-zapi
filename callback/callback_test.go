@@ -10,7 +10,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -82,7 +81,7 @@ func getPrivateKey(t *testing.T) (string, *ecdsa.PrivateKey) {
 func TestCallbackHandler(t *testing.T) {
 	const app = "testapp"
 
-	if err := os.RemoveAll(filepath.Join(zvelo.DataDir, app)); err != nil {
+	if err := os.RemoveAll(zvelo.DataDir(app)); err != nil {
 		t.Fatal(err)
 	}
 

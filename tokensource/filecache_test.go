@@ -2,7 +2,6 @@ package tokensource
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 
 	"golang.org/x/oauth2"
@@ -40,7 +39,7 @@ func TestFileCache(t *testing.T) {
 
 	var err error
 
-	if err = os.RemoveAll(filepath.Join(zvelo.DataDir, app)); err != nil {
+	if err = os.RemoveAll(zvelo.DataDir(app)); err != nil {
 		t.Fatal(err)
 	}
 

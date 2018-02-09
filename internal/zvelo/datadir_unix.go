@@ -11,13 +11,15 @@ import (
 )
 
 // https://standards.freedesktop.org/basedir-spec/basedir-spec-latest.html
-var DataDir string
-
-func init() {
-	if xdh := os.Getenv("XDG_DATA_HOME"); xdh != "" {
-		DataDir = xdh
-		return
+func DataDir(name string) string {
+	if dir := os.Getenv("SNAP_USER_COMMON"); dir != "" {
+		// the dir is already specific to the app, so don't append `name`
+		return dir
 	}
 
-	DataDir = filepath.Join(os.Getenv("HOME"), ".local", "share")
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, name)
+	}
+
+	return filepath.Join(os.Getenv("HOME"), ".local", "share", name)
 }

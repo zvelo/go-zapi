@@ -51,7 +51,7 @@ func FileCache(src oauth2.TokenSource, app, name string, scopes ...string) oauth
 
 	return fileCache{
 		src:      src,
-		fileName: filepath.Join(zvelo.DataDir, app, fmt.Sprintf("token_%x.json", hash.Sum(nil))),
+		fileName: filepath.Join(zvelo.DataDir(app), fmt.Sprintf("token_%x.json", hash.Sum(nil))),
 	}
 }
 
