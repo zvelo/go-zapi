@@ -101,7 +101,7 @@ func (c *restV1Client) GraphQL(ctx context.Context, query string, result interfa
 	if err != nil {
 		return err
 	}
-	defer func() { _ = body.Close() }()
+	defer func() { _ = body.Close() }() // #nosec
 
 	if ps, ok := result.(*string); ok {
 		s, err := ioutil.ReadAll(body)
@@ -172,10 +172,10 @@ func (c *restV1Client) do(ctx context.Context, method, url string, body io.Reade
 		// try to resolve the body as a grpc error
 		var eb errorBody
 		if err = json.NewDecoder(resp.Body).Decode(&eb); err == nil && eb.Error != "" && eb.Code != 0 {
-			_ = resp.Body.Close()
+			_ = resp.Body.Close() // #nosec
 			return nil, status.Error(eb.Code, eb.Error)
 		}
-		_ = resp.Body.Close()
+		_ = resp.Body.Close() // #nosec
 		return nil, errors.Errorf("http error: %s", resp.Status)
 	}
 
@@ -196,7 +196,7 @@ func (c *restV1Client) doPB(ctx context.Context, method, url string, in, out pro
 	if err != nil {
 		return err
 	}
-	defer func() { _ = body.Close() }()
+	defer func() { _ = body.Close() }() // #nosec
 
 	if out == nil {
 		return nil
@@ -253,7 +253,7 @@ func (c restV1StreamClient) Recv() (*msg.QueryResult, error) {
 
 	if err := c.Decode(&item); err != nil {
 		if err == io.EOF {
-			_ = c.Close()
+			_ = c.Close() // #nosec
 		}
 
 		return nil, err

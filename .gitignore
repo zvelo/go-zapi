@@ -1,4 +1,3 @@
 /vendor/
-/Gopkg.lock
 /zapi
 *.coverprofile

@@ -45,6 +45,7 @@ type options struct {
 	tracerFunc            func() opentracing.Tracer
 	trace                 bool
 	tlsInsecureSkipVerify bool
+	withoutTLS            bool
 }
 
 // An Option is used to configure different parts of this package. Not every
@@ -127,10 +128,19 @@ func WithTLSInsecureSkipVerify() Option {
 	return func(o *options) {
 		o.tlsInsecureSkipVerify = true
 		if t, ok := o.transport.(*http.Transport); ok {
+			// #nosec
 			t.TLSClientConfig = &tls.Config{
 				InsecureSkipVerify: true,
 			}
 		}
+	}
+}
+
+// WithoutTLS disables TLS when connecting to zveloAPI
+func WithoutTLS() Option {
+	return func(o *options) {
+		o.withoutTLS = true
+		o.restBaseURL.Scheme = "http"
 	}
 }
 
@@ -169,25 +179,29 @@ func WithAddr(val string) Option {
 		val = DefaultAddr
 	}
 
-	if !strings.Contains(val, "://") {
-		val = "https://" + val
-	}
+	return func(o *options) {
+		if !strings.Contains(val, "://") {
+			if o.restBaseURL != nil {
+				val = o.restBaseURL.Scheme + "://" + val
+			} else {
+				val = "https://" + val
+			}
+		}
 
-	p, err := url.Parse(val)
-	if err != nil {
-		panic(err)
-	}
-
-	port := p.Port()
-	if port == "" {
-		o, err := net.LookupPort("tcp", p.Scheme)
+		p, err := url.Parse(val)
 		if err != nil {
 			panic(err)
 		}
-		port = strconv.Itoa(o)
-	}
 
-	return func(o *options) {
+		port := p.Port()
+		if port == "" {
+			o, err := net.LookupPort("tcp", p.Scheme)
+			if err != nil {
+				panic(err)
+			}
+			port = strconv.Itoa(o)
+		}
+
 		o.grpcTarget = net.JoinHostPort(p.Hostname(), port)
 		o.restBaseURL = p
 	}

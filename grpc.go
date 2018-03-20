@@ -41,17 +41,20 @@ type grpcV1Dialer struct {
 }
 
 func (d grpcV1Dialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Client, error) {
-	var tc tls.Config
-	if d.options.tlsInsecureSkipVerify {
-		tc.InsecureSkipVerify = true
-	}
+	dialOpts := append([]grpc.DialOption{}, opts...)
 
-	dialOpts := append([]grpc.DialOption{
-		grpc.WithTransportCredentials(credentials.NewTLS(&tc)),
-		grpc.WithUnaryInterceptor(
-			otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
-		),
-	}, opts...)
+	dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(
+		otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
+	))
+
+	if d.options.withoutTLS {
+		dialOpts = append(dialOpts, grpc.WithInsecure())
+	} else {
+		// #nosec
+		dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			InsecureSkipVerify: d.options.tlsInsecureSkipVerify,
+		})))
+	}
 
 	if d.options.TokenSource != nil {
 		dialOpts = append(dialOpts,
