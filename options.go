@@ -17,8 +17,6 @@ import (
 	"golang.org/x/oauth2"
 
 	"google.golang.org/grpc/metadata"
-
-	"zvelo.io/go-zapi/internal/zvelo"
 )
 
 // TraceIDHeader is the request header to ask that a request be sampled
@@ -40,7 +38,7 @@ type options struct {
 	debug                 io.Writer
 	transport             http.RoundTripper
 	tracerFunc            func() opentracing.Tracer
-	trace                 bool
+	trace                 string
 	tlsInsecureSkipVerify bool
 	withoutTLS            bool
 }
@@ -79,7 +77,7 @@ func (o options) restURL(dir string, elem ...string) string {
 }
 
 func (o options) NewOutgoingContext(ctx context.Context) context.Context {
-	if !o.trace {
+	if o.trace == "" {
 		return ctx
 	}
 
@@ -90,15 +88,15 @@ func (o options) NewOutgoingContext(ctx context.Context) context.Context {
 
 	return metadata.NewOutgoingContext(ctx, metadata.Join(
 		md,
-		metadata.Pairs(TraceIDHeader, zvelo.RandString(32)),
+		metadata.Pairs(TraceIDHeader, o.trace),
 	))
 }
 
 // WithTrace returns an Option that will cause all requests to be traced
 // by the api server
-func WithTrace() Option {
+func WithTrace(val string) Option {
 	return func(o *options) {
-		o.trace = true
+		o.trace = val
 	}
 }
 

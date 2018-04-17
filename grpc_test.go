@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	opentracing "github.com/opentracing/opentracing-go"
+	"github.com/segmentio/ksuid"
 
 	"golang.org/x/oauth2"
 
@@ -64,7 +65,7 @@ func init() {
 	<-mockReady
 
 	opts = []Option{
-		WithTrace(),
+		WithTrace(ksuid.New().String()),
 		WithTLSInsecureSkipVerify(),
 		WithTransport(http.DefaultTransport),
 		WithTransport(nil),
