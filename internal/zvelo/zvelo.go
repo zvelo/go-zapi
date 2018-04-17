@@ -1,6 +1,7 @@
 package zvelo
 
 import (
+	"context"
 	"crypto/rand"
 	"io"
 	"math/big"
@@ -9,19 +10,20 @@ import (
 	"strings"
 
 	"github.com/fatih/color"
+	"google.golang.org/grpc/metadata"
 )
 
-// DebugRequest logs incoming http.Requests to stderr
+// DebugRequest logs incoming http.Requests to w
 func DebugRequest(w io.Writer, req *http.Request) {
 	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
 }
 
-// DebugRequestOut logs outgoing http.Requests to stderr
+// DebugRequestOut logs outgoing http.Requests to w
 func DebugRequestOut(w io.Writer, req *http.Request) {
 	debugHTTP(w, color.FgGreen, "> ", func() ([]byte, error) { return httputil.DumpRequestOut(req, true) })
 }
 
-// DebugResponse logs received http.Responses to stderr
+// DebugResponse logs received http.Responses to w
 func DebugResponse(w io.Writer, resp *http.Response, body bool) {
 	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, body) })
 }
@@ -33,7 +35,7 @@ func debugHTTP(w io.Writer, attr color.Attribute, prefix string, fn func() ([]by
 
 	dump, err := fn()
 	if err != nil {
-		_, _ = color.New(color.FgRed).Fprintf(w, "%s\n", err)
+		_, _ = color.New(color.FgRed).Fprintf(w, "%s\n", err) // #nosec
 		return
 	}
 
@@ -66,4 +68,33 @@ func DebugHandler(w io.Writer, next http.Handler) http.Handler {
 		DebugRequest(w, req)
 		next.ServeHTTP(rw, req)
 	})
+}
+
+// DebugContextOut logs outgoing metadata headers to w
+func DebugContextOut(ctx context.Context, w io.Writer) {
+	md, ok := metadata.FromOutgoingContext(ctx)
+	if !ok {
+		return
+	}
+
+	debugMD(w, color.FgGreen, "> ", md)
+}
+
+// DebugMD logs received metadata headers to w
+func DebugMD(w io.Writer, md metadata.MD) {
+	debugMD(w, color.FgYellow, "< ", md)
+}
+
+func debugMD(w io.Writer, attr color.Attribute, prefix string, md metadata.MD) {
+	if w == nil {
+		return
+	}
+
+	write := color.New(attr).FprintfFunc()
+
+	for k, vs := range md {
+		for _, v := range vs {
+			write(w, "%s%s: %s\n", prefix, k, v)
+		}
+	}
 }

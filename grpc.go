@@ -13,7 +13,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
+	"google.golang.org/grpc/metadata"
 
+	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/msg"
 )
 
@@ -87,15 +89,27 @@ func NewGRPCv1(ts oauth2.TokenSource, opts ...Option) GRPCv1Dialer {
 }
 
 func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
-	return c.client.Query(ctx, in, opts...)
+	zvelo.DebugContextOut(ctx, c.options.debug)
+	header, opts := grpcHeader(opts...)
+	resp, err := c.client.Query(ctx, in, opts...)
+	zvelo.DebugMD(c.options.debug, *header)
+	return resp, err
 }
 
 func (c grpcV1Client) Result(ctx context.Context, in *msg.RequestID, opts ...grpc.CallOption) (*msg.QueryResult, error) {
-	return c.client.Result(ctx, in, opts...)
+	zvelo.DebugContextOut(ctx, c.options.debug)
+	header, opts := grpcHeader(opts...)
+	resp, err := c.client.Result(ctx, in, opts...)
+	zvelo.DebugMD(c.options.debug, *header)
+	return resp, err
 }
 
 func (c grpcV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...grpc.CallOption) (*empty.Empty, error) {
-	return c.client.Suggest(ctx, in, opts...)
+	zvelo.DebugContextOut(ctx, c.options.debug)
+	header, opts := grpcHeader(opts...)
+	resp, err := c.client.Suggest(ctx, in, opts...)
+	zvelo.DebugMD(c.options.debug, *header)
+	return resp, err
 }
 
 func (c grpcV1Client) Stream(ctx context.Context, in *empty.Empty, opts ...grpc.CallOption) (msg.APIv1_StreamClient, error) {
@@ -103,5 +117,26 @@ func (c grpcV1Client) Stream(ctx context.Context, in *empty.Empty, opts ...grpc.
 		in = &empty.Empty{}
 	}
 
-	return c.client.Stream(ctx, in, opts...)
+	zvelo.DebugContextOut(ctx, c.options.debug)
+	header, opts := grpcHeader(opts...)
+	resp, err := c.client.Stream(ctx, in, opts...)
+	zvelo.DebugMD(c.options.debug, *header)
+	return resp, err
+}
+
+func grpcHeader(opts ...grpc.CallOption) (*metadata.MD, []grpc.CallOption) {
+	var header *metadata.MD
+
+	for _, o := range opts {
+		if h, ok := o.(grpc.HeaderCallOption); ok {
+			header = h.HeaderAddr
+		}
+	}
+
+	if header == nil {
+		header = &metadata.MD{}
+		opts = append(opts, grpc.Header(header))
+	}
+
+	return header, opts
 }
