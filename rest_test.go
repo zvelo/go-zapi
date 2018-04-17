@@ -36,7 +36,10 @@ func TestREST(t *testing.T) {
 	}()
 
 	var resp *http.Response
-	replies, err := client.Query(ctx, queryRequest, Response(&resp))
+	replies, err := client.Query(ctx, queryRequest,
+		WithHeader("x-foo", "bar"),
+		Response(&resp),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

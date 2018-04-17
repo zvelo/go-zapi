@@ -87,17 +87,14 @@ func NewGRPCv1(ts oauth2.TokenSource, opts ...Option) GRPCv1Dialer {
 }
 
 func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
-	ctx = c.options.NewOutgoingContext(ctx)
 	return c.client.Query(ctx, in, opts...)
 }
 
 func (c grpcV1Client) Result(ctx context.Context, in *msg.RequestID, opts ...grpc.CallOption) (*msg.QueryResult, error) {
-	ctx = c.options.NewOutgoingContext(ctx)
 	return c.client.Result(ctx, in, opts...)
 }
 
 func (c grpcV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...grpc.CallOption) (*empty.Empty, error) {
-	ctx = c.options.NewOutgoingContext(ctx)
 	return c.client.Suggest(ctx, in, opts...)
 }
 
@@ -106,6 +103,5 @@ func (c grpcV1Client) Stream(ctx context.Context, in *empty.Empty, opts ...grpc.
 		in = &empty.Empty{}
 	}
 
-	ctx = c.options.NewOutgoingContext(ctx)
 	return c.client.Stream(ctx, in, opts...)
 }

@@ -46,12 +46,19 @@ type restV1Client struct {
 // Call after it completes. It is only used with the RESTv1Client.
 // grpc.CallOption is still available for the GRPCv1Client.
 type CallOption interface {
+	before(*http.Request)
 	after(*http.Response)
 }
 
 type afterCall func(*http.Response)
 
+func (o afterCall) before(*http.Request)      {}
 func (o afterCall) after(resp *http.Response) { o(resp) }
+
+type beforeCall func(*http.Request)
+
+func (o beforeCall) before(r *http.Request) { o(r) }
+func (o beforeCall) after(*http.Response)   {}
 
 // Response will return the entire http.Response received from a zveloAPI call.
 // This is useful to request or response headers, see http error messages, read
@@ -59,6 +66,14 @@ func (o afterCall) after(resp *http.Response) { o(resp) }
 func Response(h **http.Response) CallOption {
 	return afterCall(func(resp *http.Response) {
 		*h = resp
+	})
+}
+
+// WithHeader adds the header named key with value val to outgoing REST http
+// requests
+func WithHeader(key, val string) CallOption {
+	return beforeCall(func(r *http.Request) {
+		r.Header.Add(key, val)
 	})
 }
 
@@ -158,6 +173,10 @@ func (c *restV1Client) do(ctx context.Context, method, url string, body io.Reade
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+
+	for _, opt := range opts {
+		opt.before(req)
+	}
 
 	resp, err := c.client.Do(req.WithContext(ctx))
 	if err != nil {

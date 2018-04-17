@@ -1,7 +1,6 @@
 package zapi
 
 import (
-	"context"
 	"crypto/tls"
 	"io"
 	"io/ioutil"
@@ -15,12 +14,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 
 	"golang.org/x/oauth2"
-
-	"google.golang.org/grpc/metadata"
 )
-
-// TraceIDHeader is the request header to ask that a request be sampled
-const TraceIDHeader = "x-client-trace-id"
 
 // UserAgent is the user agent that will be provided by the RESTv1Client. It can
 // be overridden by providing a custom transport using the WithTransport Option.
@@ -38,7 +32,6 @@ type options struct {
 	debug                 io.Writer
 	transport             http.RoundTripper
 	tracerFunc            func() opentracing.Tracer
-	trace                 string
 	tlsInsecureSkipVerify bool
 	withoutTLS            bool
 }
@@ -74,30 +67,6 @@ func (o options) restURL(dir string, elem ...string) string {
 	u.Path = path.Join(parts...)
 
 	return u.String()
-}
-
-func (o options) NewOutgoingContext(ctx context.Context) context.Context {
-	if o.trace == "" {
-		return ctx
-	}
-
-	var md metadata.MD
-	if oc, ok := metadata.FromOutgoingContext(ctx); ok {
-		md = oc.Copy()
-	}
-
-	return metadata.NewOutgoingContext(ctx, metadata.Join(
-		md,
-		metadata.Pairs(TraceIDHeader, o.trace),
-	))
-}
-
-// WithTrace returns an Option that will cause all requests to be traced
-// by the api server
-func WithTrace(val string) Option {
-	return func(o *options) {
-		o.trace = val
-	}
 }
 
 // WithTransport returns an Option that will cause all requests from the
