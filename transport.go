@@ -81,6 +81,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		)
 	}
 
+	req = zvelo.DebugRequestTiming(t.debug, req)
 	zvelo.DebugRequestOut(t.debug, req)
 
 	res, err := t.transport.RoundTrip(req)

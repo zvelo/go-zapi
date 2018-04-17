@@ -3,9 +3,11 @@ package zvelo
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"io"
 	"math/big"
 	"net/http"
+	"net/http/httptrace"
 	"net/http/httputil"
 	"strconv"
 	"strings"
@@ -18,6 +20,45 @@ import (
 // DebugRequest logs incoming http.Requests to w
 func DebugRequest(w io.Writer, req *http.Request) {
 	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpRequest(req, true) })
+}
+
+// DebugRequestTiming logs http request timing to w
+func DebugRequestTiming(w io.Writer, req *http.Request) *http.Request {
+	var start, dnsStart, connectStart, tlsStart, reqStart time.Time
+
+	trace := &httptrace.ClientTrace{
+		GetConn: func(hostPort string) {
+			start = time.Now()
+		},
+		DNSStart: func(info httptrace.DNSStartInfo) {
+			dnsStart = time.Now()
+		},
+		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+			printTiming(w, "* DNS Lookup: %v\n", time.Since(dnsStart))
+		},
+		ConnectStart: func(network, addr string) {
+			connectStart = time.Now()
+		},
+		ConnectDone: func(network, addr string, err error) {
+			printTiming(w, "* TCP Connection: %v\n", time.Since(connectStart))
+		},
+		TLSHandshakeStart: func() {
+			tlsStart = time.Now()
+		},
+		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			printTiming(w, "* TLS Handshake: %v\n", time.Since(tlsStart))
+		},
+		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			reqStart = time.Now()
+		},
+		GotFirstResponseByte: func() {
+			printTiming(w, "* Server Processing: %v\n", time.Since(reqStart))
+			printTiming(w, "* Total: %v\n", time.Since(start))
+		},
+	}
+
+	ctx := httptrace.WithClientTrace(req.Context(), trace)
+	return req.WithContext(ctx)
 }
 
 // DebugRequestOut logs outgoing http.Requests to w
