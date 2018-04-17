@@ -37,6 +37,9 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	req.Header.Set("User-Agent", UserAgent)
 
+	// prevent "double" gzip decoding
+	req.Header.Set("Accept-Encoding", "")
+
 	var parentCtx opentracing.SpanContext
 	if parent := opentracing.SpanFromContext(req.Context()); parent != nil {
 		parentCtx = parent.Context()
