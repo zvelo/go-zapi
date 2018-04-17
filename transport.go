@@ -8,6 +8,7 @@ import (
 	opentracing "github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/ext"
 	"github.com/opentracing/opentracing-go/log"
+	"github.com/segmentio/ksuid"
 )
 
 var _ http.RoundTripper = (*transport)(nil)
@@ -82,7 +83,7 @@ func (t *transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	if t.trace {
-		req.Header.Set(DebugHeader, zvelo.RandString(32))
+		req.Header.Set(TraceIDHeader, ksuid.New().String())
 	}
 
 	zvelo.DebugRequestOut(t.debug, req)
