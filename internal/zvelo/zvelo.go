@@ -7,7 +7,9 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httputil"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"google.golang.org/grpc/metadata"
@@ -26,6 +28,12 @@ func DebugRequestOut(w io.Writer, req *http.Request) {
 // DebugResponse logs received http.Responses to w
 func DebugResponse(w io.Writer, resp *http.Response, body bool) {
 	debugHTTP(w, color.FgYellow, "< ", func() ([]byte, error) { return httputil.DumpResponse(resp, body) })
+
+	if resp != nil {
+		if dur, ok := upstreamDur(resp.Header); ok {
+			printTiming(w, "* Upstream Processing: %v\n", dur)
+		}
+	}
 }
 
 func debugHTTP(w io.Writer, attr color.Attribute, prefix string, fn func() ([]byte, error)) {
@@ -80,9 +88,38 @@ func DebugContextOut(ctx context.Context, w io.Writer) {
 	debugMD(w, color.FgGreen, "> ", md)
 }
 
+var printTiming = color.New(color.FgBlue).FprintfFunc()
+
+func upstreamDur(header map[string][]string) (time.Duration, bool) {
+	var t string
+	for k, vs := range header {
+		if strings.EqualFold(k, "x-envoy-upstream-service-time") {
+			if len(vs) > 0 {
+				t = vs[0]
+				break
+			}
+		}
+	}
+
+	if t == "" {
+		return 0, false
+	}
+
+	i, err := strconv.Atoi(t)
+	if err != nil {
+		return 0, false
+	}
+
+	return time.Duration(i) * time.Millisecond, true
+}
+
 // DebugMD logs received metadata headers to w
 func DebugMD(w io.Writer, md metadata.MD) {
 	debugMD(w, color.FgYellow, "< ", md)
+
+	if dur, ok := upstreamDur(md); ok {
+		printTiming(w, "* Upstream Processing: %v\n", dur)
+	}
 }
 
 func debugMD(w io.Writer, attr color.Attribute, prefix string, md metadata.MD) {
