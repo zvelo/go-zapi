@@ -30,7 +30,7 @@ type fileToken struct {
 func FileCache(src oauth2.TokenSource, app, name string, scopes ...string) oauth2.TokenSource {
 	hash := sha256.New()
 
-	_, _ = hash.Write([]byte(name))
+	_, _ = hash.Write([]byte(name)) // #nosec
 
 	// unique
 	m := map[string]struct{}{}
@@ -46,7 +46,7 @@ func FileCache(src oauth2.TokenSource, app, name string, scopes ...string) oauth
 	sort.Strings(scopes)
 
 	for _, scope := range scopes {
-		_, _ = hash.Write([]byte(scope))
+		_, _ = hash.Write([]byte(scope)) // #nosec
 	}
 
 	return fileCache{
@@ -60,7 +60,7 @@ func (s fileCache) Token() (*oauth2.Token, error) {
 
 	// ignore errors since we can always just go to the src
 	if f, err := os.Open(s.fileName); err == nil {
-		defer func() { _ = f.Close() }()
+		defer func() { _ = f.Close() }() // #nosec
 
 		var token fileToken
 		if err = json.NewDecoder(f).Decode(&token); err == nil && token.Valid() {
@@ -91,7 +91,7 @@ func (s fileCache) Token() (*oauth2.Token, error) {
 		return nil, err
 	}
 
-	defer func() { _ = f.Close() }()
+	defer func() { _ = f.Close() }() // #nosec
 
 	ft := fileToken{Token: token}
 	if extra := token.Extra("id_token"); extra != nil {

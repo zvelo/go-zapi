@@ -34,26 +34,26 @@ func DebugRequestTiming(w io.Writer, req *http.Request) *http.Request {
 			dnsStart = time.Now()
 		},
 		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
-			printTiming(w, "* DNS Lookup: %v\n", time.Since(dnsStart))
+			DebugTiming(w, "DNS Lookup", time.Since(dnsStart))
 		},
 		ConnectStart: func(network, addr string) {
 			connectStart = time.Now()
 		},
 		ConnectDone: func(network, addr string, err error) {
-			printTiming(w, "* TCP Connection: %v\n", time.Since(connectStart))
+			DebugTiming(w, "TCP Connection", time.Since(connectStart))
 		},
 		TLSHandshakeStart: func() {
 			tlsStart = time.Now()
 		},
 		TLSHandshakeDone: func(tls.ConnectionState, error) {
-			printTiming(w, "* TLS Handshake: %v\n", time.Since(tlsStart))
+			DebugTiming(w, "TLS Handshake", time.Since(tlsStart))
 		},
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
 			reqStart = time.Now()
 		},
 		GotFirstResponseByte: func() {
-			printTiming(w, "* Server Processing: %v\n", time.Since(reqStart))
-			printTiming(w, "* Total: %v\n", time.Since(start))
+			DebugTiming(w, "Server Processing", time.Since(reqStart))
+			DebugTiming(w, "Total", time.Since(start))
 		},
 	}
 
@@ -72,7 +72,7 @@ func DebugResponse(w io.Writer, resp *http.Response, body bool) {
 
 	if resp != nil {
 		if dur, ok := upstreamDur(resp.Header); ok {
-			printTiming(w, "* Upstream Processing: %v\n", dur)
+			DebugTiming(w, "Upstream Processing", dur)
 		}
 	}
 }
@@ -129,7 +129,11 @@ func DebugContextOut(ctx context.Context, w io.Writer) {
 	debugMD(w, color.FgGreen, "> ", md)
 }
 
-var printTiming = color.New(color.FgBlue).FprintfFunc()
+// DebugTiming logs timing information to w
+func DebugTiming(w io.Writer, name string, dur time.Duration) {
+	write := color.New(color.FgBlue).FprintfFunc()
+	write(w, "* %s: %v\n", name, dur)
+}
 
 func upstreamDur(header map[string][]string) (time.Duration, bool) {
 	var t string
@@ -159,7 +163,7 @@ func DebugMD(w io.Writer, md metadata.MD) {
 	debugMD(w, color.FgYellow, "< ", md)
 
 	if dur, ok := upstreamDur(md); ok {
-		printTiming(w, "* Upstream Processing: %v\n", dur)
+		DebugTiming(w, "Upstream Processing", dur)
 	}
 }
 
