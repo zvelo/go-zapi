@@ -37,7 +37,7 @@
 
 [[constraint]]
   name = "zvelo.io/msg"
-  version = "~1.12.8"
+  version = "~1.13.0"
 
 [[override]]
   name = "github.com/graph-gophers/graphql-go"
