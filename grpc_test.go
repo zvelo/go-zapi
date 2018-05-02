@@ -71,8 +71,10 @@ func init() {
 		WithTracer(opentracing.GlobalTracer()),
 		WithDebug(ioutil.Discard),
 		WithDebug(nil),
-		WithAddr(""),
-		WithAddr(mockAddr),
+		WithRestBaseURL(""),
+		WithRestBaseURL(mockAddr),
+		WithGrpcTarget(""),
+		WithGrpcTarget(mockAddr),
 	}
 
 	queryRequest = &msg.QueryRequests{

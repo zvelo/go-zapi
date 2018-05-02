@@ -4,11 +4,9 @@ import (
 	"crypto/tls"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"path"
-	"strconv"
 	"strings"
 
 	opentracing "github.com/opentracing/opentracing-go"
@@ -20,10 +18,14 @@ import (
 // be overridden by providing a custom transport using the WithTransport Option.
 const UserAgent = "go-zapi v1"
 
-// DefaultAddr is used by both GRPCv1Client and RESTv1Client as the default
-// address:port for all zveloAPI calls. It can be overridden using the WithAddr
-// Option.
-const DefaultAddr = "api.zvelo.com"
+// DefaultRestBaseURL is used by the RESTv1Client as the default base URL for all
+// zveloAPI calls. It can be overridden using the WithRestBaseURL Option.
+const DefaultRestBaseURL = "https://api.zvelo.com/"
+
+// DefaultGrpcTarget is used by the GRPCv1Client as the default
+// scheme://authority/endpoint_name for all zveloAPI calls. It can be
+// overridden using the WithGrpcTarget Option.
+const DefaultGrpcTarget = "dns:///api.zvelo.com"
 
 type options struct {
 	oauth2.TokenSource
@@ -47,7 +49,8 @@ func defaults(ts oauth2.TokenSource) *options {
 		tracerFunc:  opentracing.GlobalTracer,
 		debug:       ioutil.Discard,
 	}
-	WithAddr(DefaultAddr)(&o)
+	WithRestBaseURL(DefaultRestBaseURL)(&o)
+	WithGrpcTarget(DefaultGrpcTarget)(&o)
 	return &o
 }
 
@@ -136,11 +139,11 @@ func WithDebug(val io.Writer) Option {
 	}
 }
 
-// WithAddr returns an Option that overrides the default address:port for all
+// WithRestBaseURL returns an Option that overrides the default base URL for all
 // zveloAPI requests
-func WithAddr(val string) Option {
+func WithRestBaseURL(val string) Option {
 	if val == "" {
-		val = DefaultAddr
+		val = DefaultRestBaseURL
 	}
 
 	return func(o *options) {
@@ -152,21 +155,23 @@ func WithAddr(val string) Option {
 			}
 		}
 
-		p, err := url.Parse(val)
-		if err != nil {
-			panic(err)
-		}
-
-		port := p.Port()
-		if port == "" {
-			o, err := net.LookupPort("tcp", p.Scheme)
-			if err != nil {
-				panic(err)
+		if p, err := url.Parse(val); err == nil {
+			if p.Path == "" {
+				p.Path = "/"
 			}
-			port = strconv.Itoa(o)
+			o.restBaseURL = p
 		}
+	}
+}
 
-		o.grpcTarget = net.JoinHostPort(p.Hostname(), port)
-		o.restBaseURL = p
+// WithGrpcTarget returns an Option that overrides the default gRPC target for
+// all zveloAPI requests
+func WithGrpcTarget(val string) Option {
+	if val == "" {
+		val = DefaultGrpcTarget
+	}
+
+	return func(o *options) {
+		o.grpcTarget = val
 	}
 }
