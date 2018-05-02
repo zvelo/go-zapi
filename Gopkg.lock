@@ -35,7 +35,7 @@
   branch = "master"
   name = "github.com/go-openapi/analysis"
   packages = ["."]
-  revision = "f59a71f0ece6f9dfb438be7f45148f006cbad88e"
+  revision = "863ac7f90e00e88e507095639a8457bbbf3c2ec9"
 
 [[projects]]
   branch = "master"
@@ -103,8 +103,8 @@
     "ptypes/struct",
     "ptypes/timestamp"
   ]
-  revision = "925541529c1fa6821df4e44ce2723319eb2be768"
-  version = "v1.0.0"
+  revision = "b4deda0973fb4c70b50d226b1af49f3da59f5265"
+  version = "v1.1.0"
 
 [[projects]]
   name = "github.com/google/go-cmp"
@@ -233,7 +233,7 @@
     "ed25519",
     "ed25519/internal/edwards25519"
   ]
-  revision = "d6449816ce06963d9d136eee5a56fca5b0616e7e"
+  revision = "613d6eafa307c6881a737a3c35c0e312e8d3a8c5"
 
 [[projects]]
   branch = "master"
@@ -249,7 +249,7 @@
     "lex/httplex",
     "trace"
   ]
-  revision = "8d16fa6dc9a85c1cd3ed24ad08ff21cf94f10888"
+  revision = "5f9ae10d9af5b1c89ae6904293b14b064d4ada23"
 
 [[projects]]
   branch = "master"
@@ -268,7 +268,7 @@
   branch = "master"
   name = "golang.org/x/sys"
   packages = ["unix"]
-  revision = "b126b21c05a91c856b027c16779c12e3bf236954"
+  revision = "78d5f264b493f125018180c204871ecf58a2dce1"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -316,7 +316,7 @@
     "googleapis/api/annotations",
     "googleapis/rpc/status"
   ]
-  revision = "7fd901a49ba6a7f87732eb344f6e3c5b19d1b200"
+  revision = "86e600f69ee4704c6efbf6a2a40a5c10700e76c2"
 
 [[projects]]
   name = "google.golang.org/grpc"
@@ -392,18 +392,18 @@
     "mock",
     "status"
   ]
-  revision = "47c8765a4302633e0168560f7bab6923b868d1d3"
-  version = "v1.13.0"
+  revision = "c4ebacde0386d1957fe574506639258c566d1a4d"
+  version = "v1.13.3"
 
 [[projects]]
   name = "zvelo.io/zmage"
   packages = ["."]
-  revision = "a60a30727820bd07ddb4d1437a99461003eba7c9"
-  version = "v3.2.2"
+  revision = "587e9df0c49e4ccf145a784ffb1027c56c62de2a"
+  version = "v4.0.2"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d72027bee2b2afbd2cd54ca7afb3a1beac59434fdb5d811466fa56264dd4a6ba"
+  inputs-digest = "6efecfb451a47379cf6d1494c4ee1e025937c029f49840c12dcb00dd7326a606"
   solver-name = "gps-cdcl"
   solver-version = 1
