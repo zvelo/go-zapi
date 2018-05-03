@@ -159,11 +159,13 @@ func upstreamDur(header map[string][]string) (time.Duration, bool) {
 }
 
 // DebugMD logs received metadata headers to w
-func DebugMD(w io.Writer, md metadata.MD) {
-	debugMD(w, color.FgYellow, "< ", md)
+func DebugMD(w io.Writer, mds ...metadata.MD) {
+	for _, md := range mds {
+		debugMD(w, color.FgYellow, "< ", md)
 
-	if dur, ok := upstreamDur(md); ok {
-		DebugTiming(w, "Upstream Processing", dur)
+		if dur, ok := upstreamDur(md); ok {
+			DebugTiming(w, "Upstream Processing", dur)
+		}
 	}
 }
 

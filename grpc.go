@@ -90,25 +90,25 @@ func NewGRPCv1(ts oauth2.TokenSource, opts ...Option) GRPCv1Dialer {
 
 func (c grpcV1Client) Query(ctx context.Context, in *msg.QueryRequests, opts ...grpc.CallOption) (*msg.QueryReplies, error) {
 	zvelo.DebugContextOut(ctx, c.options.debug)
-	header, opts := grpcHeader(opts...)
+	header, trailer, opts := grpcMD(opts...)
 	resp, err := c.client.Query(ctx, in, opts...)
-	zvelo.DebugMD(c.options.debug, *header)
+	zvelo.DebugMD(c.options.debug, *header, *trailer)
 	return resp, err
 }
 
 func (c grpcV1Client) Result(ctx context.Context, in *msg.RequestID, opts ...grpc.CallOption) (*msg.QueryResult, error) {
 	zvelo.DebugContextOut(ctx, c.options.debug)
-	header, opts := grpcHeader(opts...)
+	header, trailer, opts := grpcMD(opts...)
 	resp, err := c.client.Result(ctx, in, opts...)
-	zvelo.DebugMD(c.options.debug, *header)
+	zvelo.DebugMD(c.options.debug, *header, *trailer)
 	return resp, err
 }
 
 func (c grpcV1Client) Suggest(ctx context.Context, in *msg.Suggestion, opts ...grpc.CallOption) (*empty.Empty, error) {
 	zvelo.DebugContextOut(ctx, c.options.debug)
-	header, opts := grpcHeader(opts...)
+	header, trailer, opts := grpcMD(opts...)
 	resp, err := c.client.Suggest(ctx, in, opts...)
-	zvelo.DebugMD(c.options.debug, *header)
+	zvelo.DebugMD(c.options.debug, *header, *trailer)
 	return resp, err
 }
 
@@ -118,18 +118,20 @@ func (c grpcV1Client) Stream(ctx context.Context, in *empty.Empty, opts ...grpc.
 	}
 
 	zvelo.DebugContextOut(ctx, c.options.debug)
-	header, opts := grpcHeader(opts...)
+	header, trailer, opts := grpcMD(opts...)
 	resp, err := c.client.Stream(ctx, in, opts...)
-	zvelo.DebugMD(c.options.debug, *header)
+	zvelo.DebugMD(c.options.debug, *header, *trailer)
 	return resp, err
 }
 
-func grpcHeader(opts ...grpc.CallOption) (*metadata.MD, []grpc.CallOption) {
-	var header *metadata.MD
+func grpcMD(in ...grpc.CallOption) (header, trailer *metadata.MD, opts []grpc.CallOption) {
+	for _, o := range in {
+		if m, ok := o.(grpc.HeaderCallOption); ok {
+			header = m.HeaderAddr
+		}
 
-	for _, o := range opts {
-		if h, ok := o.(grpc.HeaderCallOption); ok {
-			header = h.HeaderAddr
+		if m, ok := o.(grpc.TrailerCallOption); ok {
+			trailer = m.TrailerAddr
 		}
 	}
 
@@ -138,5 +140,10 @@ func grpcHeader(opts ...grpc.CallOption) (*metadata.MD, []grpc.CallOption) {
 		opts = append(opts, grpc.Header(header))
 	}
 
-	return header, opts
+	if trailer == nil {
+		trailer = &metadata.MD{}
+		opts = append(opts, grpc.Trailer(trailer))
+	}
+
+	return
 }
