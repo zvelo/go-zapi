@@ -20,7 +20,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	"zvelo.io/msg"
+	msg "zvelo.io/msg/msgpb"
 )
 
 const (

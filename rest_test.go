@@ -9,8 +9,8 @@ import (
 
 	opentracing "github.com/opentracing/opentracing-go"
 
-	"zvelo.io/msg"
 	"zvelo.io/msg/mock"
+	msg "zvelo.io/msg/msgpb"
 )
 
 func TestREST(t *testing.T) {
@@ -65,8 +65,8 @@ func TestREST(t *testing.T) {
 
 	err = client.Suggest(ctx, &msg.Suggestion{
 		Url: "http://example.com",
-		Dataset: &msg.DataSet{
-			Echo: &msg.DataSet_Echo{
+		Dataset: &msg.Dataset{
+			Echo: &msg.Dataset_Echo{
 				Url: "http://example.com",
 			},
 		},
@@ -137,7 +137,7 @@ var graphQLQuery1Str = `query {
 }
 
 fragment resultFields on QueryResult {
-	responseDataSet {
+	responseDataset {
 		categorization
 		malicious {
 			category

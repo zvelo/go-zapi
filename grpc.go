@@ -16,7 +16,7 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"zvelo.io/go-zapi/internal/zvelo"
-	"zvelo.io/msg"
+	msg "zvelo.io/msg/msgpb"
 )
 
 // A GRPCv1Client implements msg.APIv1Client as well as an io.Closer that, if

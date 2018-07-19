@@ -14,8 +14,8 @@ import (
 
 	"google.golang.org/grpc/metadata"
 
-	"zvelo.io/msg"
 	"zvelo.io/msg/mock"
+	msg "zvelo.io/msg/msgpb"
 )
 
 var (
@@ -79,7 +79,7 @@ func init() {
 
 	queryRequest = &msg.QueryRequests{
 		Url: []string{queryURL},
-		Dataset: []msg.DataSetType{
+		Dataset: []msg.DatasetType{
 			msg.CATEGORIZATION,
 			msg.ECHO,
 		},
@@ -89,14 +89,14 @@ func init() {
 func queryExpect(reqID string) *msg.QueryResult {
 	return &msg.QueryResult{
 		RequestId: reqID,
-		ResponseDataset: &msg.DataSet{
-			Categorization: &msg.DataSet_Categorization{
+		ResponseDataset: &msg.Dataset{
+			Categorization: &msg.Dataset_Categorization{
 				Value: []msg.Category{
 					msg.BLOG_4,
 					msg.NEWS_4,
 				},
 			},
-			Echo: &msg.DataSet_Echo{
+			Echo: &msg.Dataset_Echo{
 				Url: queryURL,
 			},
 		},
@@ -160,8 +160,8 @@ func TestGRPC(t *testing.T) {
 
 	_, err = client.Suggest(ctx, &msg.Suggestion{
 		Url: "http://example.com",
-		Dataset: &msg.DataSet{
-			Echo: &msg.DataSet_Echo{
+		Dataset: &msg.Dataset{
+			Echo: &msg.Dataset_Echo{
 				Url: "http://example.com",
 			},
 		},

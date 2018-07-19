@@ -10,7 +10,7 @@ import (
 
 	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/httpsig"
-	"zvelo.io/msg"
+	msg "zvelo.io/msg/msgpb"
 )
 
 var jsonUnmarshaler = jsonpb.Unmarshaler{

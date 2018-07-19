@@ -21,7 +21,7 @@ import (
 
 	"zvelo.io/go-zapi/internal/zvelo"
 	"zvelo.io/httpsig"
-	"zvelo.io/msg"
+	msg "zvelo.io/msg/msgpb"
 )
 
 func handler(m **msg.QueryResult) Handler {
@@ -89,8 +89,8 @@ func TestCallbackHandler(t *testing.T) {
 	srv := httptest.NewServer(Middleware(KeyGetter(MemKeyCache()), handler(&m), nil))
 
 	r := msg.QueryResult{
-		ResponseDataset: &msg.DataSet{
-			Categorization: &msg.DataSet_Categorization{
+		ResponseDataset: &msg.Dataset{
+			Categorization: &msg.Dataset_Categorization{
 				Value: []msg.Category{
 					msg.BLOG_4,
 					msg.NEWS_4,
