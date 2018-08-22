@@ -11,6 +11,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/balancer/grpclb" // register the grpclb balancer
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/oauth"
 	"google.golang.org/grpc/metadata"
