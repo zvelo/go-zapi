@@ -14,6 +14,7 @@ import (
 	"github.com/gogo/protobuf/proto"
 	"github.com/pkg/errors"
 
+	"golang.org/x/net/http2"
 	"golang.org/x/oauth2"
 
 	"google.golang.org/grpc/codes"
@@ -99,6 +100,10 @@ func NewRESTv1(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
 	o := defaults(ts)
 	for _, opt := range opts {
 		opt(o)
+	}
+
+	if t, ok := o.transport.(*http.Transport); ok {
+		_ = http2.ConfigureTransport(t) // #nosec
 	}
 
 	return &restV1Client{

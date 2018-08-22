@@ -13,6 +13,7 @@ require (
 	github.com/pkg/browser v0.0.0-20170505125900-c90ca0c84f15
 	github.com/pkg/errors v0.8.0
 	golang.org/x/crypto v0.0.0-20180718160520-a2144134853f // indirect
+	golang.org/x/net v0.0.0-20180821023952-922f4815f713
 	golang.org/x/oauth2 v0.0.0-20180620175406-ef147856a6dd
 	golang.org/x/sys v0.0.0-20180715085529-ac767d655b30 // indirect
 	google.golang.org/appengine v1.1.0 // indirect
