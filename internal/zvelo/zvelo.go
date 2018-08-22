@@ -11,6 +11,7 @@ import (
 	"net/http/httputil"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/fatih/color"
@@ -25,35 +26,54 @@ func DebugRequest(w io.Writer, req *http.Request) {
 // DebugRequestTiming logs http request timing to w
 func DebugRequestTiming(w io.Writer, req *http.Request) *http.Request {
 	var start, dnsStart, connectStart, tlsStart, reqStart time.Time
+	var mu sync.Mutex
 
 	trace := &httptrace.ClientTrace{
 		GetConn: func(hostPort string) {
+			mu.Lock()
 			start = time.Now()
+			mu.Unlock()
 		},
 		DNSStart: func(info httptrace.DNSStartInfo) {
+			mu.Lock()
 			dnsStart = time.Now()
+			mu.Unlock()
 		},
 		DNSDone: func(dnsInfo httptrace.DNSDoneInfo) {
+			mu.Lock()
 			DebugTiming(w, "DNS Lookup", time.Since(dnsStart))
+			mu.Unlock()
 		},
 		ConnectStart: func(network, addr string) {
+			mu.Lock()
 			connectStart = time.Now()
+			mu.Unlock()
 		},
 		ConnectDone: func(network, addr string, err error) {
+			mu.Lock()
 			DebugTiming(w, "TCP Connection", time.Since(connectStart))
+			mu.Unlock()
 		},
 		TLSHandshakeStart: func() {
+			mu.Lock()
 			tlsStart = time.Now()
+			mu.Unlock()
 		},
 		TLSHandshakeDone: func(tls.ConnectionState, error) {
+			mu.Lock()
 			DebugTiming(w, "TLS Handshake", time.Since(tlsStart))
+			mu.Unlock()
 		},
 		WroteRequest: func(info httptrace.WroteRequestInfo) {
+			mu.Lock()
 			reqStart = time.Now()
+			mu.Unlock()
 		},
 		GotFirstResponseByte: func() {
+			mu.Lock()
 			DebugTiming(w, "Server Processing", time.Since(reqStart))
 			DebugTiming(w, "Total", time.Since(start))
+			mu.Unlock()
 		},
 	}
 
