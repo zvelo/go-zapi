@@ -7,18 +7,14 @@ import (
 	"testing"
 	"text/template"
 
-	opentracing "github.com/opentracing/opentracing-go"
-
 	"zvelo.io/msg/mock"
 	msg "zvelo.io/msg/msgpb"
 )
 
 func TestREST(t *testing.T) {
-	span, ctx := opentracing.StartSpanFromContext(context.Background(), "test")
-	defer span.Finish()
-
 	client := NewRESTv1(TestTokenSource{}, opts...)
 
+	ctx := context.Background()
 	ctx = mock.QueryContext(ctx, mock.WithCategories(msg.BLOG_4, msg.NEWS_4))
 
 	streamCh := make(chan *msg.QueryResult)

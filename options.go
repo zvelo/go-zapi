@@ -9,8 +9,6 @@ import (
 	"path"
 	"strings"
 
-	opentracing "github.com/opentracing/opentracing-go"
-
 	"golang.org/x/oauth2"
 )
 
@@ -33,7 +31,6 @@ type options struct {
 	restBaseURL           *url.URL
 	debug                 io.Writer
 	transport             http.RoundTripper
-	tracerFunc            func() opentracing.Tracer
 	tlsInsecureSkipVerify bool
 	withoutTLS            bool
 }
@@ -46,20 +43,11 @@ func defaults(ts oauth2.TokenSource) *options {
 	o := options{
 		TokenSource: ts,
 		transport:   http.DefaultTransport,
-		tracerFunc:  opentracing.GlobalTracer,
 		debug:       ioutil.Discard,
 	}
 	WithRestBaseURL(DefaultRestBaseURL)(&o)
 	WithGrpcTarget(DefaultGrpcTarget)(&o)
 	return &o
-}
-
-func (o options) tracer() opentracing.Tracer {
-	if tracer := o.tracerFunc(); tracer != nil {
-		return tracer
-	}
-
-	return opentracing.NoopTracer{}
 }
 
 func (o options) restURL(dir string, elem ...string) string {
@@ -108,21 +96,6 @@ func WithoutTLS() Option {
 	return func(o *options) {
 		o.withoutTLS = true
 		o.restBaseURL.Scheme = "http"
-	}
-}
-
-// WithTracer returns an Option that will cause requests to be instrumented by
-// the given tracer. If not specified, opentracing.GlobalTracer will be used.
-func WithTracer(val opentracing.Tracer) Option {
-	return func(o *options) {
-		if val == nil {
-			o.tracerFunc = opentracing.GlobalTracer
-			return
-		}
-
-		o.tracerFunc = func() opentracing.Tracer {
-			return val
-		}
 	}
 }
 

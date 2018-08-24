@@ -96,14 +96,6 @@
   version = "v1.4.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:7b760aa6dbe426378f54934270dde1b176fda379111da2154748f030fffe4d3f"
-  name = "github.com/grpc-ecosystem/grpc-opentracing"
-  packages = ["go/otgrpc"]
-  pruneopts = "NUT"
-  revision = "8e809c8a86450a29b90dcc9efbf062d0fe6d9746"
-
-[[projects]]
   digest = "1:08c231ec84231a7e23d67e4b58f975e1423695a32467a362ee55a803f9de8061"
   name = "github.com/mattn/go-colorable"
   packages = ["."]
@@ -182,7 +174,7 @@
     "trace",
   ]
   pruneopts = "NUT"
-  revision = "922f4815f713f213882e8ef45e0d315b164d705c"
+  revision = "faa378e6dbaed88bd8100f8bcf09939375c6e8fa"
 
 [[projects]]
   branch = "master"
@@ -201,11 +193,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:79209e00ef385d406c6f7404fcb5ddadce9f1d68669f8526ea890d590d56c8bb"
+  digest = "1:eb50c3ef5dc70f737f1945c76e3129f4a36e04bbb09d8b144af3ed39022f3a6a"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "NUT"
-  revision = "3b58ed4ad3395d483fc92d5d14123ce2c3581fec"
+  revision = "11551d06cbcc94edc80a0facaccbda56473c19c1"
 
 [[projects]]
   digest = "1:e7071ed636b5422cc51c0e3a6cebc229d6c9fffc528814b519a980641422d619"
@@ -261,12 +253,14 @@
   revision = "c66870c02cf823ceb633bcd05be3c7cda29976f4"
 
 [[projects]]
-  digest = "1:a6b0b7f7e3b3d0d3bd090b120948c4519b6407828078935868d3207b12958a00"
+  digest = "1:ccad6b485f30e431506245026e6295363ce95a2303ebe1b1338d61977fe5f3cd"
   name = "google.golang.org/grpc"
   packages = [
     ".",
     "balancer",
     "balancer/base",
+    "balancer/grpclb",
+    "balancer/grpclb/grpc_lb_v1",
     "balancer/roundrobin",
     "codes",
     "connectivity",
@@ -320,7 +314,7 @@
   version = "v1.1.5"
 
 [[projects]]
-  digest = "1:65cb6ce0942f88ed1dffdcfd5dd51098a6c0747f4c49a56df6ae1bb393ea078d"
+  digest = "1:cbe4f081bcb1b6ea8f673d1422313056d075e3e50ea47209b58f08e0535adf77"
   name = "zvelo.io/msg"
   packages = [
     "internal/static",
@@ -329,8 +323,8 @@
     "status",
   ]
   pruneopts = "NUT"
-  revision = "2fe4471834e7f0e79c006ece41a0442c77aea79f"
-  version = "v1.14.1"
+  revision = "58bec0212bb86961791b6017cd855844718134d7"
+  version = "v1.14.4"
 
 [solve-meta]
   analyzer-name = "dep"
@@ -341,16 +335,13 @@
     "github.com/gogo/protobuf/proto",
     "github.com/golang/protobuf/ptypes/empty",
     "github.com/google/go-cmp/cmp",
-    "github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc",
-    "github.com/opentracing/opentracing-go",
-    "github.com/opentracing/opentracing-go/ext",
-    "github.com/opentracing/opentracing-go/log",
     "github.com/pkg/browser",
     "github.com/pkg/errors",
     "golang.org/x/net/http2",
     "golang.org/x/oauth2",
     "golang.org/x/oauth2/clientcredentials",
     "google.golang.org/grpc",
+    "google.golang.org/grpc/balancer/grpclb",
     "google.golang.org/grpc/codes",
     "google.golang.org/grpc/credentials",
     "google.golang.org/grpc/credentials/oauth",

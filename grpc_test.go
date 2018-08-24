@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	opentracing "github.com/opentracing/opentracing-go"
 
 	"golang.org/x/oauth2"
 
@@ -67,8 +66,6 @@ func init() {
 		WithTLSInsecureSkipVerify(),
 		WithTransport(http.DefaultTransport),
 		WithTransport(nil),
-		WithTracer(nil),
-		WithTracer(opentracing.GlobalTracer()),
 		WithDebug(ioutil.Discard),
 		WithDebug(nil),
 		WithRestBaseURL(""),

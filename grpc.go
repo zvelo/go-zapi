@@ -6,7 +6,6 @@ import (
 	"io"
 
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/grpc-ecosystem/grpc-opentracing/go/otgrpc"
 
 	"golang.org/x/oauth2"
 
@@ -45,10 +44,6 @@ type grpcV1Dialer struct {
 
 func (d grpcV1Dialer) Dial(ctx context.Context, opts ...grpc.DialOption) (GRPCv1Client, error) {
 	dialOpts := append([]grpc.DialOption{}, opts...)
-
-	dialOpts = append(dialOpts, grpc.WithUnaryInterceptor(
-		otgrpc.OpenTracingClientInterceptor(d.options.tracer()),
-	))
 
 	if d.options.withoutTLS {
 		dialOpts = append(dialOpts, grpc.WithInsecure())
