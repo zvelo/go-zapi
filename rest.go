@@ -3,6 +3,7 @@ package zapi
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -103,7 +104,13 @@ func NewRESTv1(ts oauth2.TokenSource, opts ...Option) RESTv1Client {
 	}
 
 	if t, ok := o.transport.(*http.Transport); ok {
-		_ = http2.ConfigureTransport(t) // #nosec
+		if o.noHTTP2 {
+			t.TLSNextProto = map[string]func(authority string, c *tls.Conn) http.RoundTripper{}
+		} else {
+			// ensures that even if insecure-skip-verify is enabled, we still
+			// use http/2
+			_ = http2.ConfigureTransport(t) // #nosec
+		}
 	}
 
 	return &restV1Client{

@@ -30,6 +30,7 @@ type options struct {
 	grpcTarget            string
 	restBaseURL           *url.URL
 	debug                 io.Writer
+	noHTTP2               bool
 	transport             http.RoundTripper
 	tlsInsecureSkipVerify bool
 	withoutTLS            bool
@@ -109,6 +110,13 @@ func WithDebug(val io.Writer) Option {
 
 	return func(o *options) {
 		o.debug = val
+	}
+}
+
+// WithoutHTTP2 disables the http/2 client for REST queries
+func WithoutHTTP2() Option {
+	return func(o *options) {
+		o.noHTTP2 = true
 	}
 }
 
