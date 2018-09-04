@@ -17,5 +17,5 @@ require (
 	google.golang.org/grpc v1.14.0
 	gopkg.in/square/go-jose.v2 v2.1.8
 	zvelo.io/httpsig v1.1.5
-	zvelo.io/msg v1.14.4
+	zvelo.io/msg v1.14.6
 )
